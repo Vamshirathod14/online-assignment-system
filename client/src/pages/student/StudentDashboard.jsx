@@ -29,7 +29,7 @@ function formatCountdown(ms) {
   return { label: `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`, large: false };
 }
 
-function TestCountdownCard({ test, now, onStart, startingTest }) {
+function TestCountdownCard({ test, now, onStart, onResume, startingTest }) {
   const startDate = new Date(test.startDate);
   const endDate = new Date(test.endDate);
   const isCompleted = test.studentStatus === 'completed';
@@ -54,14 +54,14 @@ function TestCountdownCard({ test, now, onStart, startingTest }) {
     status = 'Upcoming';
     statusColor = 'text-amber-700';
     statusBg = 'bg-amber-50 border-amber-200';
-    countdownMs = startDate.getTime() - now.getTime();
+    countdownMs = startDate.getTime() - now;
     const fc = formatCountdown(countdownMs);
     countdownLabel = fc ? `Starts in ${fc.label}` : null;
   } else if (now >= startDate && now <= endDate && test.status === 'active') {
     status = 'Live Now';
     statusColor = 'text-accent-700';
     statusBg = 'bg-accent-50 border-accent-200';
-    countdownMs = endDate.getTime() - now.getTime();
+    countdownMs = endDate.getTime() - now;
     const fc = formatCountdown(countdownMs);
     countdownLabel = fc ? `Ends in ${fc.label}` : null;
   } else {
@@ -138,7 +138,7 @@ function TestCountdownCard({ test, now, onStart, startingTest }) {
             </span>
           ) : isInProgress ? (
             <button
-              onClick={() => navigate(`/student/exam/${test._id}`)}
+              onClick={() => onResume(test._id)}
               className="btn bg-amber-500 text-white hover:bg-amber-600 shadow-sm"
             >
               <PlayCircle className="w-4 h-4" /> Resume
@@ -297,6 +297,7 @@ export default function StudentDashboard() {
                 test={test}
                 now={now}
                 onStart={handleStartExam}
+                onResume={(attemptId) => navigate(`/student/exam/${attemptId}`)}
                 startingTest={startingTest}
               />
             ))}
