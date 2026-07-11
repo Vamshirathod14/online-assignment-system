@@ -11,7 +11,7 @@ const initialQuestion = {
   optionD: '',
   correctOption: 'A',
   difficulty: 'medium',
-  marks: '1',
+
   subject: '',
 };
 
@@ -58,7 +58,6 @@ export default function AdminQuestions() {
     if (!formData.optionC.trim()) newErrors.optionC = 'Option C is required';
     if (!formData.optionD.trim()) newErrors.optionD = 'Option D is required';
     if (!formData.subject.trim()) newErrors.subject = 'Subject is required';
-    if (!formData.marks || Number(formData.marks) <= 0) newErrors.marks = 'Valid marks required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -79,7 +78,6 @@ export default function AdminQuestions() {
       ],
       correctOption: formData.correctOption,
       difficulty: formData.difficulty,
-      marks: Number(formData.marks),
       subject: formData.subject,
     };
 
@@ -266,7 +264,7 @@ export default function AdminQuestions() {
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="label">Correct Answer *</label>
                   <select name="correctOption" value={formData.correctOption} onChange={handleChange} className="input-field">
@@ -283,12 +281,6 @@ export default function AdminQuestions() {
                     <option value="medium">Medium</option>
                     <option value="hard">Hard</option>
                   </select>
-                </div>
-                <div>
-                  <label className="label">Marks *</label>
-                  <input name="marks" type="number" min="1" value={formData.marks} onChange={handleChange}
-                    className={`input-field ${errors.marks ? 'border-red-400' : ''}`} />
-                  {errors.marks && <p className="text-red-500 text-xs mt-1">{errors.marks}</p>}
                 </div>
                 <div>
                   <label className="label">Subject *</label>
@@ -329,7 +321,6 @@ export default function AdminQuestions() {
                   <th className="table-header-cell">Question</th>
                   <th className="table-header-cell">Subject</th>
                   <th className="table-header-cell">Difficulty</th>
-                  <th className="table-header-cell">Marks</th>
                   <th className="table-header-cell">Correct</th>
                   <th className="table-header-cell">Actions</th>
                 </tr>
@@ -341,7 +332,6 @@ export default function AdminQuestions() {
                     <td className="table-cell font-medium text-gray-900 max-w-xs truncate">{q.questionText}</td>
                     <td className="table-cell text-gray-600">{q.subject}</td>
                     <td className="table-cell">{getDifficultyBadge(q.difficulty)}</td>
-                    <td className="table-cell text-gray-600">{q.marks}</td>
                     <td className="table-cell font-mono font-semibold text-gray-900">{q.correctOption}</td>
                     <td className="table-cell">
                       <div className="flex gap-1">

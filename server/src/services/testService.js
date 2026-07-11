@@ -3,6 +3,7 @@ const ApiError = require('../utils/ApiError');
 
 const testService = {
   async create(data) {
+    data.totalMarks = Number(data.totalQuestions);
     return await Test.create(data);
   },
 
@@ -34,6 +35,9 @@ const testService = {
   },
 
   async update(id, data) {
+    if (data.totalQuestions) {
+      data.totalMarks = Number(data.totalQuestions);
+    }
     const test = await Test.findByIdAndUpdate(id, data, { new: true, runValidators: true });
     if (!test) {
       throw ApiError.notFound('Test not found');
@@ -78,10 +82,11 @@ const testService = {
     if (!test) {
       throw ApiError.notFound('Test not found');
     }
+    const numQuestions = count || test.totalQuestions;
     const questions = await Question.aggregate([
-      { $sample: { size: count } },
+      { $sample: { size: numQuestions } },
     ]);
-    if (questions.length < count) {
+    if (questions.length < numQuestions) {
       throw ApiError.badRequest(`Only ${questions.length} questions available in the bank`);
     }
     test.assignedQuestions = questions.map((q) => q._id);

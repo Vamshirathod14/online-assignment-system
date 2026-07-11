@@ -8,7 +8,6 @@ const initialFormData = {
   branch: '',
   duration: '',
   totalQuestions: '',
-  totalMarks: '',
   passingMarks: '',
   startDate: '',
   endDate: '',
@@ -69,7 +68,6 @@ export default function AdminTests() {
     if (!formData.branch.trim()) newErrors.branch = 'Branch is required';
     if (!formData.duration || Number(formData.duration) <= 0) newErrors.duration = 'Valid duration is required';
     if (!formData.totalQuestions || Number(formData.totalQuestions) <= 0) newErrors.totalQuestions = 'Valid total questions is required';
-    if (!formData.totalMarks || Number(formData.totalMarks) <= 0) newErrors.totalMarks = 'Valid total marks is required';
     if (!formData.passingMarks || Number(formData.passingMarks) <= 0) newErrors.passingMarks = 'Valid passing marks is required';
     if (!formData.startDate) newErrors.startDate = 'Start date is required';
     if (!formData.endDate) newErrors.endDate = 'End date is required';
@@ -106,7 +104,6 @@ export default function AdminTests() {
       branch: test.branch,
       duration: test.duration,
       totalQuestions: test.totalQuestions,
-      totalMarks: test.totalMarks,
       passingMarks: test.passingMarks,
       startDate: test.startDate ? new Date(test.startDate).toISOString().slice(0, 16) : '',
       endDate: test.endDate ? new Date(test.endDate).toISOString().slice(0, 16) : '',
@@ -153,7 +150,7 @@ export default function AdminTests() {
           alert('Enter a valid number of questions');
           return;
         }
-        await api.put(`/tests/${assignTestId}/assign-random`, { count: Number(assignCount) });
+        await api.put(`/tests/${assignTestId}/assign-random`, { count: Number(assignCount) || undefined });
       } else {
         if (selectedQuestions.length === 0) {
           alert('Select at least one question');
@@ -234,7 +231,7 @@ export default function AdminTests() {
                 <label className="label">Description</label>
                 <textarea name="description" value={formData.description} onChange={handleChange} rows={2} className="input-field" />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="label">Duration (min) *</label>
                   <input name="duration" type="number" value={formData.duration} onChange={handleChange} className={`input-field ${errors.duration ? 'border-red-400' : ''}`} />
@@ -244,11 +241,6 @@ export default function AdminTests() {
                   <label className="label">Total Questions *</label>
                   <input name="totalQuestions" type="number" value={formData.totalQuestions} onChange={handleChange} className={`input-field ${errors.totalQuestions ? 'border-red-400' : ''}`} />
                   {errors.totalQuestions && <p className="text-red-500 text-xs mt-1">{errors.totalQuestions}</p>}
-                </div>
-                <div>
-                  <label className="label">Total Marks *</label>
-                  <input name="totalMarks" type="number" value={formData.totalMarks} onChange={handleChange} className={`input-field ${errors.totalMarks ? 'border-red-400' : ''}`} />
-                  {errors.totalMarks && <p className="text-red-500 text-xs mt-1">{errors.totalMarks}</p>}
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -330,7 +322,7 @@ export default function AdminTests() {
                           onChange={() => toggleQuestionSelection(q._id)} className="mt-1 rounded" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-800 line-clamp-1">{q.questionText}</p>
-                          <p className="text-xs text-gray-500">{q.subject} &middot; {q.difficulty} &middot; {q.marks} marks</p>
+                          <p className="text-xs text-gray-500">{q.subject} &middot; {q.difficulty}</p>
                         </div>
                       </label>
                     ))

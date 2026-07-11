@@ -95,7 +95,7 @@ const questionService = {
           ],
           correctOption: correctAnswer,
           difficulty,
-          marks: Number(row.Marks) || 1,
+          marks: 1,
           subject: String(row.Subject).trim(),
           createdBy,
         });

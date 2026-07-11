@@ -45,21 +45,17 @@ const securityService = {
       questionMap[q._id.toString()] = q;
     }
 
-    let obtainedMarks = 0;
     let totalCorrect = 0;
-    let totalWrong = 0;
 
     for (const answer of attempt.answers) {
       const q = questionMap[answer.questionId.toString()];
       if (q && q.correctOption === answer.selectedOption) {
-        obtainedMarks += q.marks;
         totalCorrect++;
-      } else {
-        totalWrong++;
       }
     }
 
-    const totalMarks = test.totalMarks;
+    const totalMarks = questionIds.length;
+    const obtainedMarks = totalCorrect;
     const isPassed = obtainedMarks >= test.passingMarks;
     const percentage = totalMarks > 0 ? Math.round((obtainedMarks / totalMarks) * 10000) / 100 : 0;
 
@@ -70,7 +66,7 @@ const securityService = {
       totalMarks,
       obtainedMarks,
       totalCorrectAnswers: totalCorrect,
-      totalWrongAnswers: totalWrong,
+      totalWrongAnswers: attempt.answers.length - totalCorrect,
       isPassed,
       percentage,
       isPublished: false,

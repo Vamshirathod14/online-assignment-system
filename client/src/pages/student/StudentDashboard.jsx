@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../../services/api';
@@ -12,7 +12,163 @@ import {
   Target,
   BookOpen,
   ArrowRight,
+  Timer,
 } from 'lucide-react';
+
+function formatCountdown(ms) {
+  if (ms <= 0) return null;
+  const totalSeconds = Math.floor(ms / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  if (days > 0) {
+    return { label: `${days}d ${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`, large: true };
+  }
+  return { label: `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`, large: false };
+}
+
+function TestCountdownCard({ test, now, onStart, startingTest }) {
+  const startDate = new Date(test.startDate);
+  const endDate = new Date(test.endDate);
+  const isCompleted = test.studentStatus === 'completed';
+  const isInProgress = test.studentStatus === 'in_progress';
+  const isTerminated = test.studentStatus === 'terminated';
+
+  let status, statusColor, statusBg, countdownMs, countdownLabel;
+
+  if (isCompleted) {
+    status = 'Completed';
+    statusColor = 'text-accent-700';
+    statusBg = 'bg-accent-50 border-accent-200';
+  } else if (isInProgress) {
+    status = 'In Progress';
+    statusColor = 'text-amber-700';
+    statusBg = 'bg-amber-50 border-amber-200';
+  } else if (isTerminated) {
+    status = 'Terminated';
+    statusColor = 'text-red-700';
+    statusBg = 'bg-red-50 border-red-200';
+  } else if (now < startDate) {
+    status = 'Upcoming';
+    statusColor = 'text-amber-700';
+    statusBg = 'bg-amber-50 border-amber-200';
+    countdownMs = startDate.getTime() - now.getTime();
+    const fc = formatCountdown(countdownMs);
+    countdownLabel = fc ? `Starts in ${fc.label}` : null;
+  } else if (now >= startDate && now <= endDate && test.status === 'active') {
+    status = 'Live Now';
+    statusColor = 'text-accent-700';
+    statusBg = 'bg-accent-50 border-accent-200';
+    countdownMs = endDate.getTime() - now.getTime();
+    const fc = formatCountdown(countdownMs);
+    countdownLabel = fc ? `Ends in ${fc.label}` : null;
+  } else {
+    status = 'Ended';
+    statusColor = 'text-red-700';
+    statusBg = 'bg-red-50 border-red-200';
+  }
+
+  const canStart = test.status === 'active' && now >= startDate && now <= endDate && !isCompleted && !isInProgress && !isTerminated;
+  const isEnded = now > endDate;
+  const isUpcoming = now < startDate;
+
+  const cardBorder = isCompleted
+    ? 'border-accent-200'
+    : isInProgress
+      ? 'border-amber-200'
+      : isTerminated || isEnded
+        ? 'border-red-200'
+        : canStart
+          ? 'border-accent-300'
+          : 'border-amber-200';
+
+  return (
+    <div className={`border ${cardBorder} rounded-2xl p-5 transition-all duration-300 hover:shadow-md ${
+      canStart ? 'bg-gradient-to-br from-accent-50/50 to-white' : 'bg-white'
+    }`}>
+      <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <h3 className="font-bold text-gray-900 text-lg">{test.title}</h3>
+            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${statusBg} ${statusColor}`}>
+              {status === 'Live Now' && <span className="inline-block w-1.5 h-1.5 bg-accent-500 rounded-full mr-1.5 animate-pulse" />}
+              {status}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-gray-500 mb-3">
+            <span className="flex items-center gap-1.5">
+              <Calendar className="w-4 h-4 text-gray-400" />
+              {startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-gray-400" />
+              {test.duration} min
+            </span>
+            <span className="flex items-center gap-1.5">
+              <BookOpen className="w-4 h-4 text-gray-400" />
+              {test.totalQuestions} Qs
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Target className="w-4 h-4 text-gray-400" />
+              {test.totalMarks} marks
+            </span>
+          </div>
+
+          {/* Countdown */}
+          {countdownLabel && (
+            <div className={`flex items-center gap-2 text-sm font-semibold ${
+              canStart ? 'text-accent-700' : 'text-amber-700'
+            }`}>
+              <Timer className="w-4 h-4" />
+              <span className="font-mono tracking-wide">{countdownLabel}</span>
+            </div>
+          )}
+          {isEnded && !isCompleted && (
+            <p className="text-sm text-red-500 font-medium">This assessment is no longer available.</p>
+          )}
+        </div>
+
+        <div className="flex-shrink-0">
+          {isCompleted ? (
+            <span className="flex items-center gap-1.5 text-sm text-accent-600 font-semibold">
+              <CheckCircle2 className="w-4 h-4" /> Completed
+            </span>
+          ) : isInProgress ? (
+            <button
+              onClick={() => navigate(`/student/exam/${test._id}`)}
+              className="btn bg-amber-500 text-white hover:bg-amber-600 shadow-sm"
+            >
+              <PlayCircle className="w-4 h-4" /> Resume
+            </button>
+          ) : isTerminated ? (
+            <span className="flex items-center gap-1.5 text-sm text-red-600 font-semibold">
+              <AlertTriangle className="w-4 h-4" /> Terminated
+            </span>
+          ) : (
+            <button
+              onClick={() => onStart(test._id)}
+              disabled={!canStart || startingTest === test._id}
+              className={`btn shadow-sm ${
+                canStart
+                  ? 'btn-primary'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+              }`}
+            >
+              {startingTest === test._id ? (
+                <span className="flex items-center gap-2"><span className="loading-spinner" /> Starting...</span>
+              ) : (
+                <span className="flex items-center gap-1"><PlayCircle className="w-4 h-4" /> Start Exam</span>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -21,6 +177,12 @@ export default function StudentDashboard() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [startingTest, setStartingTest] = useState(null);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -40,7 +202,7 @@ export default function StudentDashboard() {
     fetchData();
   }, []);
 
-  const handleStartExam = async (testId) => {
+  const handleStartExam = useCallback(async (testId) => {
     if (!window.confirm('Are you sure you want to start this exam? The timer will begin immediately.')) return;
     setStartingTest(testId);
     try {
@@ -51,19 +213,7 @@ export default function StudentDashboard() {
     } finally {
       setStartingTest(null);
     }
-  };
-
-  const getStatusBadge = (status) => {
-    if (status === 'completed') return <span className="badge-success">Completed</span>;
-    if (status === 'in_progress') return <span className="badge-warning">In Progress</span>;
-    if (status === 'terminated') return <span className="badge-danger">Terminated</span>;
-    return <span className="badge-neutral">Not Started</span>;
-  };
-
-  const isTestActive = (test) => {
-    const now = new Date();
-    return test.status === 'active' && now >= new Date(test.startDate) && now <= new Date(test.endDate);
-  };
+  }, [navigate]);
 
   const completedCount = tests.filter((t) => t.studentStatus === 'completed').length;
   const inProgressCount = tests.filter((t) => t.studentStatus === 'in_progress').length;
@@ -81,7 +231,6 @@ export default function StudentDashboard() {
 
   return (
     <div className="animate-fade-in">
-      {/* Welcome Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-1">
           <div className="w-10 h-10 bg-primary-100 text-primary-700 rounded-xl flex items-center justify-center text-lg font-bold">
@@ -96,7 +245,6 @@ export default function StudentDashboard() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div className="stat-card border-l-4 border-l-primary-500">
           <div className="flex items-center gap-3">
@@ -133,7 +281,6 @@ export default function StudentDashboard() {
         </div>
       </div>
 
-      {/* Available Tests */}
       <div className="section-card p-6 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Available Tests</h2>
         {tests.length === 0 ? (
@@ -143,63 +290,20 @@ export default function StudentDashboard() {
             <p className="text-sm text-gray-400 mt-1">Check back later for new assignments</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {tests.map((test) => (
-              <div key={test._id} className="border border-gray-100 rounded-xl p-5 hover:border-gray-200 hover:shadow-sm transition-all duration-200">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                      <h3 className="font-semibold text-gray-900">{test.title}</h3>
-                      {getStatusBadge(test.studentStatus)}
-                    </div>
-                    {test.description && (
-                      <p className="text-sm text-gray-500 mb-2 line-clamp-1">{test.description}</p>
-                    )}
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                      <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {test.duration} min</span>
-                      <span className="flex items-center gap-1"><BookOpen className="w-3.5 h-3.5" /> {test.totalQuestions} questions</span>
-                      <span className="flex items-center gap-1"><Target className="w-3.5 h-3.5" /> {test.totalMarks} marks</span>
-                      <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {new Date(test.startDate).toLocaleDateString()} - {new Date(test.endDate).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                  <div className="flex-shrink-0">
-                    {test.studentStatus === 'completed' ? (
-                      <span className="flex items-center gap-1.5 text-sm text-accent-600 font-semibold">
-                        <CheckCircle2 className="w-4 h-4" /> Completed
-                      </span>
-                    ) : test.studentStatus === 'in_progress' ? (
-                      <button
-                        onClick={() => navigate(`/student/exam/${test._id}`)}
-                        className="btn btn-amber-500 bg-amber-500 text-white hover:bg-amber-600 shadow-sm"
-                      >
-                        <PlayCircle className="w-4 h-4" /> Resume
-                      </button>
-                    ) : test.studentStatus === 'terminated' ? (
-                      <span className="flex items-center gap-1.5 text-sm text-red-600 font-semibold">
-                        <AlertTriangle className="w-4 h-4" /> Terminated
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleStartExam(test._id)}
-                        disabled={!isTestActive(test) || startingTest === test._id}
-                        className="btn-primary"
-                      >
-                        {startingTest === test._id ? (
-                          <span className="flex items-center gap-2"><span className="loading-spinner" /> Starting...</span>
-                        ) : (
-                          <span className="flex items-center gap-1"><PlayCircle className="w-4 h-4" /> Start Exam</span>
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <TestCountdownCard
+                key={test._id}
+                test={test}
+                now={now}
+                onStart={handleStartExam}
+                startingTest={startingTest}
+              />
             ))}
           </div>
         )}
       </div>
 
-      {/* Recent Results */}
       {history.length > 0 && (
         <div className="section-card p-6">
           <div className="flex items-center justify-between mb-4">
