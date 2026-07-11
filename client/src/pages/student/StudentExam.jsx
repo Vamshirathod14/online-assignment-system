@@ -6,6 +6,7 @@ import {
   Camera,
   CameraOff,
   AlertTriangle,
+  BookOpen,
   ChevronLeft,
   ChevronRight,
   Maximize,
