@@ -1,121 +1,130 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/shared/ProtectedRoute';
 import StudentLayout from './components/layouts/StudentLayout';
 import AdminLayout from './components/layouts/AdminLayout';
 
-import LandingPage from './pages/LandingPage';
-import StudentLogin from './pages/student/StudentLogin';
-import StudentRegister from './pages/student/StudentRegister';
-import StudentDashboard from './pages/student/StudentDashboard';
-import StudentExam from './pages/student/StudentExam';
-import StudentResults from './pages/student/StudentResults';
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const StudentLogin = lazy(() => import('./pages/student/StudentLogin'));
+const StudentRegister = lazy(() => import('./pages/student/StudentRegister'));
+const StudentDashboard = lazy(() => import('./pages/student/StudentDashboard'));
+const StudentExam = lazy(() => import('./pages/student/StudentExam'));
+const StudentResults = lazy(() => import('./pages/student/StudentResults'));
+const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminStudents = lazy(() => import('./pages/admin/AdminStudents'));
+const AdminTests = lazy(() => import('./pages/admin/AdminTests'));
+const AdminQuestions = lazy(() => import('./pages/admin/AdminQuestions'));
+const AdminResults = lazy(() => import('./pages/admin/AdminResults'));
 
-import AdminLogin from './pages/admin/AdminLogin';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminStudents from './pages/admin/AdminStudents';
-import AdminTests from './pages/admin/AdminTests';
-import AdminQuestions from './pages/admin/AdminQuestions';
-import AdminResults from './pages/admin/AdminResults';
+function PageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 border-3 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+        <p className="text-sm text-gray-500 font-medium">Loading...</p>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   const { loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-500">Loading...</div>
-      </div>
-    );
+    return <PageLoader />;
   }
 
   return (
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
 
-      <Route path="/student/login" element={<StudentLogin />} />
-      <Route path="/student/register" element={<StudentRegister />} />
-      <Route
-        path="/student/dashboard"
-        element={
-          <ProtectedRoute allowedRole="student">
-            <StudentLayout>
-              <StudentDashboard />
-            </StudentLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/student/exam/:attemptId"
-        element={
-          <ProtectedRoute allowedRole="student">
-            <StudentExam />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/student/results"
-        element={
-          <ProtectedRoute allowedRole="student">
-            <StudentLayout>
-              <StudentResults />
-            </StudentLayout>
-          </ProtectedRoute>
-        }
-      />
+        <Route path="/student/login" element={<StudentLogin />} />
+        <Route path="/student/register" element={<StudentRegister />} />
+        <Route
+          path="/student/dashboard"
+          element={
+            <ProtectedRoute allowedRole="student">
+              <StudentLayout>
+                <StudentDashboard />
+              </StudentLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/student/exam/:attemptId"
+          element={
+            <ProtectedRoute allowedRole="student">
+              <StudentExam />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/student/results"
+          element={
+            <ProtectedRoute allowedRole="student">
+              <StudentLayout>
+                <StudentResults />
+              </StudentLayout>
+            </ProtectedRoute>
+          }
+        />
 
-      <Route path="/admin/login" element={<AdminLogin />} />
-      <Route
-        path="/admin/dashboard"
-        element={
-          <ProtectedRoute allowedRole="admin">
-            <AdminLayout>
-              <AdminDashboard />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/students"
-        element={
-          <ProtectedRoute allowedRole="admin">
-            <AdminLayout>
-              <AdminStudents />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/tests"
-        element={
-          <ProtectedRoute allowedRole="admin">
-            <AdminLayout>
-              <AdminTests />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/questions"
-        element={
-          <ProtectedRoute allowedRole="admin">
-            <AdminLayout>
-              <AdminQuestions />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/results"
-        element={
-          <ProtectedRoute allowedRole="admin">
-            <AdminLayout>
-              <AdminResults />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
-    </Routes>
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route
+          path="/admin/dashboard"
+          element={
+            <ProtectedRoute allowedRole="admin">
+              <AdminLayout>
+                <AdminDashboard />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/students"
+          element={
+            <ProtectedRoute allowedRole="admin">
+              <AdminLayout>
+                <AdminStudents />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/tests"
+          element={
+            <ProtectedRoute allowedRole="admin">
+              <AdminLayout>
+                <AdminTests />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/questions"
+          element={
+            <ProtectedRoute allowedRole="admin">
+              <AdminLayout>
+                <AdminQuestions />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/results"
+          element={
+            <ProtectedRoute allowedRole="admin">
+              <AdminLayout>
+                <AdminResults />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </Suspense>
   );
 }
 

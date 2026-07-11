@@ -2,6 +2,19 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import useExamSecurity from '../../hooks/useExamSecurity';
+import {
+  Camera,
+  CameraOff,
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  Maximize,
+  Send,
+  StopCircle,
+  Clock,
+  CheckCircle2,
+  Circle,
+} from 'lucide-react';
 
 export default function StudentExam() {
   const { attemptId } = useParams();
@@ -15,6 +28,7 @@ export default function StudentExam() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [terminated, setTerminated] = useState(false);
+  const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false);
 
   const timerRef = useRef(null);
   const fetchedRef = useRef(false);
@@ -32,6 +46,7 @@ export default function StudentExam() {
   const {
     violations,
     cameraActive,
+    isFullscreen,
     warning,
     enterFullscreen,
     startCamera,
@@ -54,13 +69,12 @@ export default function StudentExam() {
       setAnswers(data.data.answers || {});
       setTimeRemaining(data.data.timeRemaining);
       setLoading(false);
-      enterFullscreen();
       startCamera();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load exam');
       setLoading(false);
     }
-  }, [attemptId, enterFullscreen, startCamera]);
+  }, [attemptId, startCamera]);
 
   useEffect(() => {
     fetchExamData();
@@ -131,12 +145,21 @@ export default function StudentExam() {
 
   const handleTerminateClick = async () => {
     if (!window.confirm('Are you sure you want to terminate this exam? This action cannot be undone.')) return;
-    await terminateExam('student自愿');
+    await terminateExam('student_voluntary');
+  };
+
+  const handleEnterFullscreen = () => {
+    enterFullscreen();
+    setHasEnteredFullscreen(true);
   };
 
   const formatTime = (seconds) => {
-    const m = Math.floor(seconds / 60);
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
+    if (h > 0) {
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
@@ -146,29 +169,40 @@ export default function StudentExam() {
     return 'not-answered';
   };
 
+  const getTimerColor = () => {
+    if (timeRemaining <= 60) return 'text-red-600 bg-red-50 border-red-200';
+    if (timeRemaining <= 300) return 'text-amber-600 bg-amber-50 border-amber-200';
+    return 'text-gray-700 bg-gray-50 border-gray-200';
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-500 text-lg">Loading exam...</div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-3 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+          <p className="text-sm text-gray-500 font-medium">Loading exam...</p>
+        </div>
       </div>
     );
   }
 
   if (error || terminated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="bg-white rounded-xl shadow-sm p-8 max-w-md text-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="section-card p-8 max-w-md text-center animate-scale-in">
           {terminated && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-600 font-semibold">Exam Terminated</p>
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+                <p className="text-red-600 font-semibold">Exam Terminated</p>
+              </div>
               <p className="text-red-500 text-sm mt-1">
                 Your exam has been terminated due to security violations.
               </p>
             </div>
           )}
-          <p className="text-red-600 mb-4">{error || 'Exam terminated'}</p>
-          <button onClick={() => navigate('/student/dashboard')}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+          <p className="text-red-600 mb-4 font-medium">{error || 'Exam terminated'}</p>
+          <button onClick={() => navigate('/student/dashboard')} className="btn-primary">
             Back to Dashboard
           </button>
         </div>
@@ -187,107 +221,161 @@ export default function StudentExam() {
   const questions = examData.questions;
   const question = questions[currentQ];
   const answeredCount = Object.keys(answers).length;
+  const progress = ((currentQ + 1) / questions.length) * 100;
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Pre-fullscreen banner */}
+      {!hasEnteredFullscreen && (
+        <div className="bg-primary-600 text-white px-4 py-3 text-center">
+          <div className="max-w-7xl mx-auto flex items-center justify-center gap-4 flex-wrap">
+            <p className="text-sm font-medium">Click below to enter fullscreen mode for the exam</p>
+            <button
+              onClick={handleEnterFullscreen}
+              className="flex items-center gap-2 bg-white text-primary-700 px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-primary-50 transition-colors"
+            >
+              <Maximize className="w-4 h-4" /> Enter Fullscreen
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Security Warning */}
       {warning && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-white px-4 py-2 text-center text-sm font-semibold">
-          {warning}
+        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white px-4 py-2.5 text-center text-sm font-semibold animate-fade-in-down shadow-lg">
+          <div className="flex items-center justify-center gap-2">
+            <AlertTriangle className="w-4 h-4" />
+            {warning}
+          </div>
         </div>
       )}
 
       {/* Top Bar */}
-      <div className="bg-white shadow-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-          <div>
-            <h1 className="font-bold text-gray-800">{examData.test.title}</h1>
-            <p className="text-xs text-gray-500">Question {currentQ + 1} of {questions.length}</p>
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="flex justify-between items-center gap-4">
+            <div className="min-w-0">
+              <h1 className="font-bold text-gray-900 text-sm sm:text-base truncate">{examData.test.title}</h1>
+              <p className="text-xs text-gray-500">Q{currentQ + 1} of {questions.length}</p>
+            </div>
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+              {/* Camera indicator */}
+              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-50 border border-gray-200">
+                {cameraActive ? (
+                  <Camera className="w-3.5 h-3.5 text-accent-600" />
+                ) : (
+                  <CameraOff className="w-3.5 h-3.5 text-red-500" />
+                )}
+                <span className="text-xs font-medium text-gray-600">{cameraActive ? 'On' : 'Off'}</span>
+              </div>
+
+              {/* Violations */}
+              {violations > 0 && (
+                <span className="badge-danger text-xs">
+                  <AlertTriangle className="w-3 h-3" /> {violations}
+                </span>
+              )}
+
+              {/* Progress */}
+              <span className="hidden sm:inline text-xs text-gray-500 font-medium">{answeredCount}/{questions.length}</span>
+
+              {/* Timer */}
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-mono text-sm font-bold ${getTimerColor()}`}>
+                <Clock className="w-3.5 h-3.5" />
+                {formatTime(timeRemaining)}
+              </div>
+
+              {/* Submit */}
+              <button
+                onClick={handleSubmit}
+                disabled={submitting || terminated}
+                className="btn-success text-xs sm:text-sm px-3 sm:px-4 py-2"
+              >
+                <Send className="w-4 h-4" />
+                <span className="hidden sm:inline">{submitting ? 'Submitting...' : 'Submit'}</span>
+              </button>
+
+              {/* Terminate */}
+              <button
+                onClick={handleTerminateClick}
+                disabled={submitting || terminated}
+                className="btn-danger text-xs sm:text-sm px-3 sm:px-4 py-2"
+              >
+                <StopCircle className="w-4 h-4" />
+                <span className="hidden sm:inline">End</span>
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${cameraActive ? 'bg-green-500' : 'bg-red-500'}`}></span>
-              <span className="text-xs text-gray-500">Camera {cameraActive ? 'On' : 'Off'}</span>
-            </div>
-            {violations > 0 && (
-              <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
-                {violations} violation{violations !== 1 ? 's' : ''}
-              </span>
-            )}
-            <span className="text-sm text-gray-500">{answeredCount}/{questions.length} answered</span>
-            <div className={`text-lg font-mono font-bold px-4 py-1 rounded-lg ${
-              timeRemaining <= 60 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-800'
-            }`}>
-              {formatTime(timeRemaining)}
-            </div>
-            <button
-              onClick={handleSubmit}
-              disabled={submitting || terminated}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50"
-            >
-              {submitting ? 'Submitting...' : 'Submit Exam'}
-            </button>
-            <button
-              onClick={handleTerminateClick}
-              disabled={submitting || terminated}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
-            >
-              Terminate
-            </button>
+          {/* Progress bar */}
+          <div className="mt-2 h-1 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary-500 rounded-full transition-all duration-500"
+              style={{ width: `${progress}%` }}
+            />
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-6 flex gap-6">
         {/* Main Question Area */}
-        <div className="flex-1">
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="mb-6">
-              <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
+        <div className="flex-1 min-w-0">
+          <div className="section-card p-6 animate-fade-in">
+            <div className="flex items-center gap-3 mb-5">
+              <span className="badge-info">
                 Q{currentQ + 1} &middot; {question.marks} mark{question.marks !== 1 ? 's' : ''}
               </span>
-              <span className="text-xs text-gray-500 ml-2">{question.subject}</span>
+              <span className="text-xs text-gray-500 flex items-center gap-1">
+                <BookOpen className="w-3.5 h-3.5" /> {question.subject}
+              </span>
             </div>
-            <p className="text-gray-800 text-lg mb-6 leading-relaxed">{question.questionText}</p>
+            <p className="text-gray-900 text-lg mb-6 leading-relaxed font-medium">{question.questionText}</p>
 
             <div className="space-y-3">
-              {question.options.map((opt) => (
-                <label
-                  key={opt.label}
-                  onClick={() => handleSaveAnswer(question._id, opt.label)}
-                  className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition ${
-                    answers[question._id] === opt.label
-                      ? 'border-indigo-500 bg-indigo-50'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                    answers[question._id] === opt.label
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 text-gray-600'
-                  }`}>
-                    {opt.label}
-                  </span>
-                  <span className="text-gray-700">{opt.text}</span>
-                </label>
-              ))}
+              {question.options.map((opt) => {
+                const isSelected = answers[question._id] === opt.label;
+                return (
+                  <button
+                    key={opt.label}
+                    onClick={() => handleSaveAnswer(question._id, opt.label)}
+                    className={`w-full flex items-center gap-4 p-4 border-2 rounded-xl text-left transition-all duration-200 ${
+                      isSelected
+                        ? 'border-primary-500 bg-primary-50 shadow-sm'
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${
+                      isSelected
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {opt.label}
+                    </span>
+                    <span className={`text-sm ${isSelected ? 'text-primary-900 font-medium' : 'text-gray-700'}`}>
+                      {opt.text}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Navigation */}
-            <div className="flex justify-between mt-8">
+            <div className="flex justify-between items-center mt-8 pt-5 border-t border-gray-100">
               <button
                 onClick={() => setCurrentQ((prev) => Math.max(0, prev - 1))}
                 disabled={currentQ === 0}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-secondary"
               >
-                Previous
+                <ChevronLeft className="w-4 h-4" /> Previous
               </button>
+              <span className="text-xs text-gray-400 font-medium">
+                {currentQ + 1} / {questions.length}
+              </span>
               <button
                 onClick={() => setCurrentQ((prev) => Math.min(questions.length - 1, prev + 1))}
                 disabled={currentQ === questions.length - 1}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary"
               >
-                Next
+                Next <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -295,8 +383,8 @@ export default function StudentExam() {
 
         {/* Question Palette */}
         <div className="w-64 flex-shrink-0 hidden lg:block">
-          <div className="bg-white rounded-xl shadow-sm p-4 sticky top-20">
-            <h3 className="font-semibold text-gray-700 mb-3 text-sm">Question Palette</h3>
+          <div className="section-card p-4 sticky top-24">
+            <h3 className="font-semibold text-gray-900 mb-3 text-sm">Question Palette</h3>
             <div className="grid grid-cols-5 gap-2 mb-4">
               {questions.map((q, idx) => {
                 const status = getQuestionStatus(q._id);
@@ -304,12 +392,13 @@ export default function StudentExam() {
                   <button
                     key={q._id}
                     onClick={() => setCurrentQ(idx)}
-                    className={`w-10 h-10 rounded-lg text-sm font-semibold transition ${
+                    aria-label={`Question ${idx + 1}${status === 'answered' ? ' (answered)' : ''}`}
+                    className={`w-10 h-10 rounded-lg text-sm font-semibold transition-all duration-200 ${
                       status === 'current'
-                        ? 'bg-indigo-600 text-white ring-2 ring-indigo-300'
+                        ? 'bg-primary-600 text-white ring-2 ring-primary-300 shadow-sm'
                         : status === 'answered'
-                        ? 'bg-green-500 text-white'
-                        : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                        ? 'bg-accent-500 text-white hover:bg-accent-600'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
                     {idx + 1}
@@ -317,13 +406,17 @@ export default function StudentExam() {
                 );
               })}
             </div>
-            <div className="space-y-2 text-xs">
+            <div className="space-y-2 text-xs border-t border-gray-100 pt-3">
               <div className="flex items-center gap-2">
-                <span className="w-4 h-4 rounded bg-green-500"></span>
+                <span className="w-3.5 h-3.5 rounded bg-primary-600 ring-2 ring-primary-300" />
+                <span className="text-gray-600">Current</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 text-accent-500" />
                 <span className="text-gray-600">Answered ({answeredCount})</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-4 h-4 rounded bg-gray-200"></span>
+                <Circle className="w-3.5 h-3.5 text-gray-300" />
                 <span className="text-gray-600">Not Answered ({questions.length - answeredCount})</span>
               </div>
             </div>

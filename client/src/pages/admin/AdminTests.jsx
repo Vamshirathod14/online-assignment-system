@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
+import { Search, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, ClipboardList, X } from 'lucide-react';
 
 const initialFormData = {
   title: '',
@@ -174,110 +175,109 @@ export default function AdminTests() {
   };
 
   return (
-    <div>
+    <div className="animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <h1 className="text-2xl font-bold text-gray-800">Tests Management</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Tests Management</h1>
+          <p className="text-sm text-gray-500 mt-1">{tests.length} test(s)</p>
+        </div>
         <button
           onClick={() => { setShowForm(true); setEditingId(null); setFormData(initialFormData); setApiError(''); }}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition"
+          className="btn-primary"
         >
-          + Create Test
+          <Plus className="w-4 h-4" /> Create Test
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-        <input
-          type="text"
-          placeholder="Search tests by title, branch..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-        />
+      <div className="card p-4 mb-6">
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search tests by title, branch..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="input-field pl-10"
+          />
+        </div>
       </div>
 
       {/* Create/Edit Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
-            <h2 className="text-xl font-bold mb-4">{editingId ? 'Edit Test' : 'Create Test'}</h2>
-            {apiError && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">{apiError}</div>}
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 animate-scale-in">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl font-bold text-gray-900">{editingId ? 'Edit Test' : 'Create Test'}</h2>
+              <button onClick={() => { setShowForm(false); setEditingId(null); }} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            {apiError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl mb-4 text-sm font-medium">
+                {apiError}
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Test Title *</label>
-                  <input name="title" value={formData.title} onChange={handleChange}
-                    className={`w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 ${errors.title ? 'border-red-500' : 'border-gray-300'}`} />
+                  <label className="label">Test Title *</label>
+                  <input name="title" value={formData.title} onChange={handleChange} className={`input-field ${errors.title ? 'border-red-400' : ''}`} />
                   {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Branch *</label>
-                  <input name="branch" value={formData.branch} onChange={handleChange}
-                    className={`w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 ${errors.branch ? 'border-red-500' : 'border-gray-300'}`} />
+                  <label className="label">Branch *</label>
+                  <input name="branch" value={formData.branch} onChange={handleChange} className={`input-field ${errors.branch ? 'border-red-400' : ''}`} />
                   {errors.branch && <p className="text-red-500 text-xs mt-1">{errors.branch}</p>}
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea name="description" value={formData.description} onChange={handleChange} rows={2}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500" />
+                <label className="label">Description</label>
+                <textarea name="description" value={formData.description} onChange={handleChange} rows={2} className="input-field" />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Duration (min) *</label>
-                  <input name="duration" type="number" value={formData.duration} onChange={handleChange}
-                    className={`w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 ${errors.duration ? 'border-red-500' : 'border-gray-300'}`} />
+                  <label className="label">Duration (min) *</label>
+                  <input name="duration" type="number" value={formData.duration} onChange={handleChange} className={`input-field ${errors.duration ? 'border-red-400' : ''}`} />
                   {errors.duration && <p className="text-red-500 text-xs mt-1">{errors.duration}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Questions *</label>
-                  <input name="totalQuestions" type="number" value={formData.totalQuestions} onChange={handleChange}
-                    className={`w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 ${errors.totalQuestions ? 'border-red-500' : 'border-gray-300'}`} />
+                  <label className="label">Total Questions *</label>
+                  <input name="totalQuestions" type="number" value={formData.totalQuestions} onChange={handleChange} className={`input-field ${errors.totalQuestions ? 'border-red-400' : ''}`} />
                   {errors.totalQuestions && <p className="text-red-500 text-xs mt-1">{errors.totalQuestions}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Marks *</label>
-                  <input name="totalMarks" type="number" value={formData.totalMarks} onChange={handleChange}
-                    className={`w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 ${errors.totalMarks ? 'border-red-500' : 'border-gray-300'}`} />
+                  <label className="label">Total Marks *</label>
+                  <input name="totalMarks" type="number" value={formData.totalMarks} onChange={handleChange} className={`input-field ${errors.totalMarks ? 'border-red-400' : ''}`} />
                   {errors.totalMarks && <p className="text-red-500 text-xs mt-1">{errors.totalMarks}</p>}
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Passing Marks *</label>
-                  <input name="passingMarks" type="number" value={formData.passingMarks} onChange={handleChange}
-                    className={`w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 ${errors.passingMarks ? 'border-red-500' : 'border-gray-300'}`} />
+                  <label className="label">Passing Marks *</label>
+                  <input name="passingMarks" type="number" value={formData.passingMarks} onChange={handleChange} className={`input-field ${errors.passingMarks ? 'border-red-400' : ''}`} />
                   {errors.passingMarks && <p className="text-red-500 text-xs mt-1">{errors.passingMarks}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
-                  <input name="startDate" type="datetime-local" value={formData.startDate} onChange={handleChange}
-                    className={`w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 ${errors.startDate ? 'border-red-500' : 'border-gray-300'}`} />
+                  <label className="label">Start Date *</label>
+                  <input name="startDate" type="datetime-local" value={formData.startDate} onChange={handleChange} className={`input-field ${errors.startDate ? 'border-red-400' : ''}`} />
                   {errors.startDate && <p className="text-red-500 text-xs mt-1">{errors.startDate}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">End Date *</label>
-                  <input name="endDate" type="datetime-local" value={formData.endDate} onChange={handleChange}
-                    className={`w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 ${errors.endDate ? 'border-red-500' : 'border-gray-300'}`} />
+                  <label className="label">End Date *</label>
+                  <input name="endDate" type="datetime-local" value={formData.endDate} onChange={handleChange} className={`input-field ${errors.endDate ? 'border-red-400' : ''}`} />
                   {errors.endDate && <p className="text-red-500 text-xs mt-1">{errors.endDate}</p>}
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select name="status" value={formData.status} onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500">
+                <label className="label">Status</label>
+                <select name="status" value={formData.status} onChange={handleChange} className="input-field">
                   <option value="inactive">Inactive</option>
                   <option value="active">Active</option>
                 </select>
               </div>
-              <div className="flex gap-3 justify-end">
-                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                  Cancel
-                </button>
-                <button type="submit"
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700">
-                  {editingId ? 'Update' : 'Create'}
-                </button>
+              <div className="flex gap-3 justify-end pt-2">
+                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }} className="btn-secondary">Cancel</button>
+                <button type="submit" className="btn-primary">{editingId ? 'Update' : 'Create'}</button>
               </div>
             </form>
           </div>
@@ -286,44 +286,51 @@ export default function AdminTests() {
 
       {/* Assign Questions Modal */}
       {showAssignModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6">
-            <h2 className="text-xl font-bold mb-4">Assign Questions to Test</h2>
-            <div className="flex gap-4 mb-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 animate-scale-in">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl font-bold text-gray-900">Assign Questions</h2>
+              <button onClick={() => setShowAssignModal(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="flex gap-2 mb-5">
               <button onClick={() => setAssignMode('random')}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold ${assignMode === 'random' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'}`}>
+                className={`btn text-sm ${assignMode === 'random' ? 'btn-primary' : 'btn-secondary'}`}>
                 Random Selection
               </button>
               <button onClick={() => { setAssignMode('manual'); fetchQuestions(); }}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold ${assignMode === 'manual' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'}`}>
+                className={`btn text-sm ${assignMode === 'manual' ? 'btn-primary' : 'btn-secondary'}`}>
                 Manual Selection
               </button>
             </div>
 
             {assignMode === 'random' ? (
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Number of Questions</label>
+                <label className="label">Number of Questions</label>
                 <input type="number" min="1" value={assignCount} onChange={(e) => setAssignCount(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Enter number of questions to randomly pick" />
+                  className="input-field" placeholder="Enter number of questions to randomly pick" />
               </div>
             ) : (
               <div>
-                <input type="text" placeholder="Search questions..." value={questionSearch}
-                  onChange={(e) => setQuestionSearch(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 mb-3 focus:ring-2 focus:ring-indigo-500" />
-                <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
+                <div className="relative mb-3">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input type="text" placeholder="Search questions..." value={questionSearch}
+                    onChange={(e) => setQuestionSearch(e.target.value)}
+                    className="input-field pl-10" />
+                </div>
+                <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-xl">
                   {questions.length === 0 ? (
-                    <p className="p-4 text-gray-500 text-center">No questions found</p>
+                    <p className="p-6 text-gray-500 text-center text-sm">No questions found</p>
                   ) : (
                     questions.map((q) => (
                       <label key={q._id}
-                        className={`flex items-start gap-3 p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 ${selectedQuestions.includes(q._id) ? 'bg-indigo-50' : ''}`}>
+                        className={`flex items-start gap-3 p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${selectedQuestions.includes(q._id) ? 'bg-primary-50' : ''}`}>
                         <input type="checkbox" checked={selectedQuestions.includes(q._id)}
-                          onChange={() => toggleQuestionSelection(q._id)} className="mt-1" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-800">{q.questionText}</p>
-                          <p className="text-xs text-gray-500">{q.subject} | {q.difficulty} | {q.marks} marks</p>
+                          onChange={() => toggleQuestionSelection(q._id)} className="mt-1 rounded" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 line-clamp-1">{q.questionText}</p>
+                          <p className="text-xs text-gray-500">{q.subject} &middot; {q.difficulty} &middot; {q.marks} marks</p>
                         </div>
                       </label>
                     ))
@@ -333,68 +340,74 @@ export default function AdminTests() {
               </div>
             )}
 
-            <div className="flex gap-3 justify-end mt-4">
-              <button onClick={() => setShowAssignModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                Cancel
-              </button>
-              <button onClick={handleAssign}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700">
-                Assign
-              </button>
+            <div className="flex gap-3 justify-end mt-5 pt-4 border-t border-gray-100">
+              <button onClick={() => setShowAssignModal(false)} className="btn-secondary">Cancel</button>
+              <button onClick={handleAssign} className="btn-primary">Assign</button>
             </div>
           </div>
         </div>
       )}
 
       {/* Tests Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200">
-          <span className="text-sm text-gray-500">{tests.length} test(s) found</span>
-        </div>
+      <div className="section-card overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading...</div>
+          <div className="flex items-center justify-center h-48">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+              <p className="text-sm text-gray-500">Loading tests...</p>
+            </div>
+          </div>
         ) : tests.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No tests found</div>
+          <div className="empty-state py-12">
+            <ClipboardList className="w-12 h-12 text-gray-300 mb-3" />
+            <p className="text-gray-500 font-medium">No tests found</p>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="table-container">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-left">
+              <thead className="table-header">
                 <tr>
-                  <th className="px-4 py-3 font-medium text-gray-600">S.No</th>
-                  <th className="px-4 py-3 font-medium text-gray-600">Title</th>
-                  <th className="px-4 py-3 font-medium text-gray-600">Branch</th>
-                  <th className="px-4 py-3 font-medium text-gray-600">Duration</th>
-                  <th className="px-4 py-3 font-medium text-gray-600">Questions</th>
-                  <th className="px-4 py-3 font-medium text-gray-600">Marks</th>
-                  <th className="px-4 py-3 font-medium text-gray-600">Status</th>
-                  <th className="px-4 py-3 font-medium text-gray-600">Actions</th>
+                  <th className="table-header-cell">#</th>
+                  <th className="table-header-cell">Title</th>
+                  <th className="table-header-cell">Branch</th>
+                  <th className="table-header-cell">Duration</th>
+                  <th className="table-header-cell">Questions</th>
+                  <th className="table-header-cell">Marks</th>
+                  <th className="table-header-cell">Status</th>
+                  <th className="table-header-cell">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {tests.map((test, index) => (
-                  <tr key={test._id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-700">{index + 1}</td>
-                    <td className="px-4 py-3 text-gray-700 font-medium">{test.title}</td>
-                    <td className="px-4 py-3 text-gray-600">{test.branch}</td>
-                    <td className="px-4 py-3 text-gray-600">{test.duration} min</td>
-                    <td className="px-4 py-3 text-gray-600">
+                  <tr key={test._id} className="hover:bg-gray-50 transition-colors">
+                    <td className="table-cell text-gray-500">{index + 1}</td>
+                    <td className="table-cell font-medium text-gray-900">{test.title}</td>
+                    <td className="table-cell text-gray-600">{test.branch}</td>
+                    <td className="table-cell text-gray-600">{test.duration} min</td>
+                    <td className="table-cell text-gray-600">
                       {test.assignedQuestions?.length || 0} / {test.totalQuestions}
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{test.totalMarks}</td>
-                    <td className="px-4 py-3">
+                    <td className="table-cell text-gray-600">{test.totalMarks}</td>
+                    <td className="table-cell">
                       <button onClick={() => handleToggleStatus(test._id)}
-                        className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                          test.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                        className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full transition-colors ${
+                          test.status === 'active' ? 'bg-accent-50 text-accent-700 hover:bg-accent-100' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}>
+                        {test.status === 'active' ? <ToggleRight className="w-3.5 h-3.5" /> : <ToggleLeft className="w-3.5 h-3.5" />}
                         {test.status === 'active' ? 'Active' : 'Inactive'}
                       </button>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2 flex-wrap">
-                        <button onClick={() => handleEdit(test)} className="text-blue-600 hover:text-blue-800 text-xs font-medium">Edit</button>
-                        <button onClick={() => openAssignModal(test)} className="text-purple-600 hover:text-purple-800 text-xs font-medium">Assign</button>
-                        <button onClick={() => handleDelete(test._id, test.title)} className="text-red-600 hover:text-red-800 text-xs font-medium">Delete</button>
+                    <td className="table-cell">
+                      <div className="flex gap-1">
+                        <button onClick={() => handleEdit(test)} className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="Edit">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => openAssignModal(test)} className="p-1.5 text-gray-500 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors" title="Assign Questions">
+                          <ClipboardList className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => handleDelete(test._id, test.title)} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </td>
                   </tr>

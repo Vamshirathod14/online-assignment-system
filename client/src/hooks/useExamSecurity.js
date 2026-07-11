@@ -8,6 +8,7 @@ export default function useExamSecurity(attemptId, onTerminate) {
   const [violations, setViolations] = useState(0);
   const [cameraActive, setCameraActive] = useState(false);
   const [warning, setWarning] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const violationCountRef = useRef(0);
   const streamRef = useRef(null);
   const snapshotTimerRef = useRef(null);
@@ -64,11 +65,12 @@ export default function useExamSecurity(attemptId, onTerminate) {
     };
 
     const handleFullscreenChange = () => {
-      const isFullscreen =
+      const fs =
         document.fullscreenElement ||
         document.webkitFullscreenElement ||
         document.mozFullScreenElement;
-      if (!isFullscreen) {
+      setIsFullscreen(!!fs);
+      if (!fs) {
         logViolation('fullscreen_exit', 'Exited fullscreen mode');
         setTimeout(requestFullscreen, 1000);
       }
@@ -133,8 +135,6 @@ export default function useExamSecurity(attemptId, onTerminate) {
     document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('keydown', handleKeyDown);
     window.addEventListener('beforeunload', handleBeforeUnload);
-
-    requestFullscreen();
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -219,6 +219,7 @@ export default function useExamSecurity(attemptId, onTerminate) {
   return {
     violations,
     cameraActive,
+    isFullscreen,
     warning,
     enterFullscreen,
     startCamera,
