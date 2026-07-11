@@ -40,8 +40,16 @@ const examAttemptSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['in_progress', 'completed', 'timed_out'],
+      enum: ['in_progress', 'completed', 'timed_out', 'terminated'],
       default: 'in_progress',
+    },
+    terminatedReason: {
+      type: String,
+      default: null,
+    },
+    ipAddress: {
+      type: String,
+      default: '',
     },
   },
   { timestamps: true }

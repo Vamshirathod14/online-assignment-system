@@ -1,0 +1,95 @@
+const { SecurityLog, ExamAttempt, Result, Question, Test } = require('../models');
+const ApiError = require('../utils/ApiError');
+
+const securityService = {
+  async logViolation(studentId, examAttemptId, violationType, details = '', ipAddress = '') {
+    const log = await SecurityLog.create({
+      studentId,
+      examAttemptId,
+      violationType,
+      details,
+      ipAddress,
+    });
+    return log;
+  },
+
+  async getLogsByAttempt(examAttemptId) {
+    return await SecurityLog.find({ examAttemptId })
+      .populate('studentId', 'name email hallTicket')
+      .sort({ createdAt: -1 });
+  },
+
+  async getLogsByStudent(studentId) {
+    return await SecurityLog.find({ studentId })
+      .populate('examAttemptId', 'testId status')
+      .sort({ createdAt: -1 });
+  },
+
+  async terminateExam(examAttemptId, studentId, reason = 'manual_termination') {
+    const attempt = await ExamAttempt.findOne({ _id: examAttemptId, studentId, status: 'in_progress' });
+    if (!attempt) {
+      throw ApiError.notFound('No active attempt found');
+    }
+
+    attempt.endTime = new Date();
+    attempt.status = 'terminated';
+    attempt.terminatedReason = reason;
+    await attempt.save();
+
+    const test = await Test.findById(attempt.testId);
+    const questionIds = attempt.questionOrder;
+    const questions = await Question.find({ _id: { $in: questionIds } });
+
+    const questionMap = {};
+    for (const q of questions) {
+      questionMap[q._id.toString()] = q;
+    }
+
+    let obtainedMarks = 0;
+    let totalCorrect = 0;
+    let totalWrong = 0;
+
+    for (const answer of attempt.answers) {
+      const q = questionMap[answer.questionId.toString()];
+      if (q && q.correctOption === answer.selectedOption) {
+        obtainedMarks += q.marks;
+        totalCorrect++;
+      } else {
+        totalWrong++;
+      }
+    }
+
+    const totalMarks = test.totalMarks;
+    const isPassed = obtainedMarks >= test.passingMarks;
+    const percentage = totalMarks > 0 ? Math.round((obtainedMarks / totalMarks) * 10000) / 100 : 0;
+
+    const result = await Result.create({
+      studentId,
+      testId: test._id,
+      examAttemptId: attempt._id,
+      totalMarks,
+      obtainedMarks,
+      totalCorrectAnswers: totalCorrect,
+      totalWrongAnswers: totalWrong,
+      isPassed,
+      percentage,
+      isPublished: false,
+    });
+
+    return { attempt, result };
+  },
+
+  async getViolationSummary(examAttemptId) {
+    const logs = await SecurityLog.find({ examAttemptId });
+    const summary = {};
+    for (const log of logs) {
+      if (!summary[log.violationType]) {
+        summary[log.violationType] = 0;
+      }
+      summary[log.violationType]++;
+    }
+    return { total: logs.length, summary };
+  },
+};
+
+module.exports = securityService;

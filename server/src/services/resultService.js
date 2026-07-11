@@ -1,60 +1,26 @@
-const { Result, ExamAttempt, Question, Test } = require('../models');
+const { Result, ExamAttempt, SecurityLog } = require('../models');
 const ApiError = require('../utils/ApiError');
+const XLSX = require('xlsx');
 
 const resultService = {
-  async calculateAndSaveResult(attemptId) {
-    const attempt = await ExamAttempt.findById(attemptId);
-    if (!attempt) {
-      throw ApiError.notFound('Exam attempt not found');
-    }
-
-    const test = await Test.findById(attempt.testId);
-    const questionIds = attempt.questionOrder;
-    const questions = await Question.find({ _id: { $in: questionIds } });
-
-    const questionMap = {};
-    for (const q of questions) {
-      questionMap[q._id.toString()] = q;
-    }
-
-    let obtainedMarks = 0;
-    let totalCorrect = 0;
-    let totalWrong = 0;
-
-    for (const answer of attempt.answers) {
-      const q = questionMap[answer.questionId.toString()];
-      if (q && q.correctOption === answer.selectedOption) {
-        obtainedMarks += q.marks;
-        totalCorrect++;
-      } else {
-        totalWrong++;
-      }
-    }
-
-    const totalMarks = test.totalMarks;
-    const isPassed = obtainedMarks >= test.passingMarks;
-    const percentage = totalMarks > 0 ? Math.round((obtainedMarks / totalMarks) * 10000) / 100 : 0;
-
-    const result = await Result.create({
-      studentId: attempt.studentId,
-      testId: test._id,
-      examAttemptId: attemptId,
-      totalMarks,
-      obtainedMarks,
-      totalCorrectAnswers: totalCorrect,
-      totalWrongAnswers: totalWrong,
-      isPassed,
-      percentage,
-      isPublished: false,
-    });
-
-    return result;
-  },
-
-  async getResultsByStudent(studentId) {
-    return await Result.find({ studentId })
-      .populate('testId', 'title totalMarks passingMarks')
+  async getPublishedResultsByStudent(studentId) {
+    const results = await Result.find({ studentId, isPublished: true })
+      .populate('testId', 'title totalMarks passingMarks branch')
       .select('-__v');
+
+    const resultsWithDetails = await Promise.all(
+      results.map(async (result) => {
+        const attempt = await ExamAttempt.findById(result.examAttemptId).select(
+          'status startTime endTime'
+        );
+        return {
+          ...result.toObject(),
+          attempt: attempt || null,
+        };
+      })
+    );
+
+    return resultsWithDetails;
   },
 
   async getResultsByTest(testId) {
@@ -73,16 +39,168 @@ const resultService = {
     return result;
   },
 
-  async getAllResults() {
-    return await Result.find()
-      .populate('studentId', 'name email hallTicket')
-      .populate('testId', 'title totalMarks passingMarks')
+  async searchResults({ search, testId, isPassed, isPublished }) {
+    const query = {};
+
+    if (isPublished !== undefined) {
+      query.isPublished = isPublished === 'true';
+    }
+
+    if (isPassed !== undefined) {
+      query.isPassed = isPassed === 'true';
+    }
+
+    if (testId) {
+      query.testId = testId;
+    }
+
+    let results = await Result.find(query)
+      .populate({
+        path: 'studentId',
+        select: 'name email hallTicket collegeName branch',
+      })
+      .populate('testId', 'title totalMarks passingMarks branch')
       .select('-__v');
+
+    if (search) {
+      const regex = new RegExp(search, 'i');
+      results = results.filter(
+        (r) =>
+          (r.studentId?.name && regex.test(r.studentId.name)) ||
+          (r.studentId?.hallTicket && regex.test(r.studentId.hallTicket)) ||
+          (r.testId?.title && regex.test(r.testId.title))
+      );
+    }
+
+    const resultsWithDetails = await Promise.all(
+      results.map(async (result) => {
+        const attempt = await ExamAttempt.findById(result.examAttemptId).select(
+          'status terminatedReason startTime endTime ipAddress'
+        );
+        const violationCount = await SecurityLog.countDocuments({
+          examAttemptId: result.examAttemptId,
+        });
+        return {
+          ...result.toObject(),
+          attempt: attempt || null,
+          violationCount,
+        };
+      })
+    );
+
+    return resultsWithDetails;
   },
 
   async publishResults(testId) {
     return await Result.updateMany({ testId, isPublished: false }, { isPublished: true });
   },
+
+  async unpublishResults(testId) {
+    return await Result.updateMany({ testId, isPublished: true }, { isPublished: false });
+  },
+
+  async publishAllResults() {
+    return await Result.updateMany({ isPublished: false }, { isPublished: true });
+  },
+
+  async unpublishAllResults() {
+    return await Result.updateMany({ isPublished: true }, { isPublished: false });
+  },
+
+  async exportResults({ search, testId, isPassed, isPublished }) {
+    const query = {};
+
+    if (isPublished !== undefined) {
+      query.isPublished = isPublished === 'true';
+    }
+
+    if (isPassed !== undefined) {
+      query.isPassed = isPassed === 'true';
+    }
+
+    if (testId) {
+      query.testId = testId;
+    }
+
+    let results = await Result.find(query)
+      .populate({
+        path: 'studentId',
+        select: 'name email hallTicket collegeName branch',
+      })
+      .populate('testId', 'title totalMarks passingMarks branch')
+      .select('-__v');
+
+    if (search) {
+      const regex = new RegExp(search, 'i');
+      results = results.filter(
+        (r) =>
+          (r.studentId?.name && regex.test(r.studentId.name)) ||
+          (r.studentId?.hallTicket && regex.test(r.studentId.hallTicket)) ||
+          (r.testId?.title && regex.test(r.testId.title))
+      );
+    }
+
+    const exportData = [];
+    for (const result of results) {
+      const attempt = await ExamAttempt.findById(result.examAttemptId).select(
+        'status terminatedReason'
+      );
+      const violationCount = await SecurityLog.countDocuments({
+        examAttemptId: result.examAttemptId,
+      });
+
+      exportData.push({
+        'Student Name': result.studentId?.name || '',
+        'Hall Ticket': result.studentId?.hallTicket || '',
+        College: result.studentId?.collegeName || '',
+        Branch: result.studentId?.branch || '',
+        Test: result.testId?.title || '',
+        Score: `${result.obtainedMarks}/${result.totalMarks}`,
+        Percentage: `${result.percentage}%`,
+        Result: result.isPassed ? 'Pass' : 'Fail',
+        'Attempt Status': (attempt?.status || '').replace(/_/g, ' '),
+        'Violation Count': violationCount,
+        Published: result.isPublished ? 'Yes' : 'No',
+      });
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Results');
+
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    return buffer;
+  },
+
+  async getExamHistory(studentId) {
+    const attempts = await ExamAttempt.find({ studentId })
+      .populate('testId', 'title totalMarks passingMarks')
+      .select('testId startTime endTime status')
+      .sort({ createdAt: -1 });
+
+    const history = [];
+    for (const attempt of attempts) {
+      const result = await Result.findOne({ examAttemptId: attempt._id, isPublished: true })
+        .select('obtainedMarks totalMarks percentage isPassed isPublished');
+
+      if (result) {
+        history.push({
+          _id: attempt._id,
+          test: attempt.testId,
+          startTime: attempt.startTime,
+          endTime: attempt.endTime,
+          status: attempt.status,
+          obtainedMarks: result.obtainedMarks,
+          totalMarks: result.totalMarks,
+          percentage: result.percentage,
+          isPassed: result.isPassed,
+        });
+      }
+    }
+
+    return history;
+  },
+
 };
 
 module.exports = resultService;

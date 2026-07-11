@@ -7,21 +7,26 @@ export default function StudentDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [tests, setTests] = useState([]);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [startingTest, setStartingTest] = useState(null);
 
   useEffect(() => {
-    const fetchTests = async () => {
+    const fetchData = async () => {
       try {
-        const { data } = await api.get('/exam/available-tests');
-        setTests(data.data);
+        const [testsRes, historyRes] = await Promise.all([
+          api.get('/exam/available-tests'),
+          api.get('/results/exam-history'),
+        ]);
+        setTests(testsRes.data.data);
+        setHistory(historyRes.data.data);
       } catch {
         // ignore
       } finally {
         setLoading(false);
       }
     };
-    fetchTests();
+    fetchData();
   }, []);
 
   const handleStartExam = async (testId) => {
@@ -40,6 +45,7 @@ export default function StudentDashboard() {
   const getStatusBadge = (status) => {
     if (status === 'completed') return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">Completed</span>;
     if (status === 'in_progress') return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">In Progress</span>;
+    if (status === 'terminated') return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Terminated</span>;
     return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">Not Started</span>;
   };
 
@@ -50,6 +56,14 @@ export default function StudentDashboard() {
 
   const completedCount = tests.filter((t) => t.studentStatus === 'completed').length;
   const inProgressCount = tests.filter((t) => t.studentStatus === 'in_progress').length;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">Loading dashboard...</div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -74,11 +88,10 @@ export default function StudentDashboard() {
         </div>
       </div>
 
+      {/* Available Tests */}
       <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
         <h2 className="text-lg font-semibold text-gray-700 mb-4">Available Tests</h2>
-        {loading ? (
-          <p className="text-gray-500">Loading tests...</p>
-        ) : tests.length === 0 ? (
+        {tests.length === 0 ? (
           <p className="text-gray-500">No active tests available at the moment.</p>
         ) : (
           <div className="space-y-4">
@@ -112,6 +125,8 @@ export default function StudentDashboard() {
                       >
                         Resume
                       </button>
+                    ) : test.studentStatus === 'terminated' ? (
+                      <span className="text-sm text-red-600 font-semibold">Terminated</span>
                     ) : (
                       <button
                         onClick={() => handleStartExam(test._id)}
@@ -129,11 +144,38 @@ export default function StudentDashboard() {
         )}
       </div>
 
-      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-        <p className="text-yellow-800 text-sm">
-          Results for completed exams will be published here once reviewed by the administrator.
-        </p>
-      </div>
+      {/* Recent Results */}
+      {history.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-gray-700 mb-4">Recent Results</h2>
+          <div className="space-y-3">
+            {history.slice(0, 5).map((h) => (
+              <div key={h._id} className="flex justify-between items-center p-3 border border-gray-200 rounded-lg">
+                <div>
+                  <h4 className="font-medium text-gray-800">{h.test?.title}</h4>
+                  <p className="text-xs text-gray-500">
+                    {h.startTime ? new Date(h.startTime).toLocaleDateString() : '-'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="font-semibold text-gray-800">{h.obtainedMarks}/{h.totalMarks}</div>
+                  <span className={`text-xs font-semibold ${h.isPassed ? 'text-green-600' : 'text-red-600'}`}>
+                    {h.isPassed ? 'Pass' : 'Fail'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {history.length === 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+          <p className="text-yellow-800 text-sm">
+            Results for completed exams will be published here once reviewed by the administrator.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

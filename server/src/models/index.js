@@ -6,4 +6,5 @@ module.exports = {
   ExamAttempt: require('./ExamAttempt'),
   Result: require('./Result'),
   CameraSnapshot: require('./CameraSnapshot'),
+  SecurityLog: require('./SecurityLog'),
 };

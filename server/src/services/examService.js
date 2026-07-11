@@ -1,4 +1,4 @@
-const { ExamAttempt, Question, Test, Result } = require('../models');
+const { ExamAttempt, Question, Test, Result, CameraSnapshot } = require('../models');
 const ApiError = require('../utils/ApiError');
 
 function shuffleArray(arr) {
@@ -33,6 +33,8 @@ const examService = {
         studentStatus = 'completed';
       } else if (attemptStatus === 'in_progress') {
         studentStatus = 'in_progress';
+      } else if (attemptStatus === 'terminated') {
+        studentStatus = 'terminated';
       }
 
       testObj.studentStatus = studentStatus;
@@ -62,7 +64,7 @@ const examService = {
     const completed = await ExamAttempt.findOne({
       studentId,
       testId,
-      status: { $in: ['completed', 'timed_out'] },
+      status: { $in: ['completed', 'timed_out', 'terminated'] },
     });
     if (completed) {
       throw ApiError.badRequest('You have already completed this test');
@@ -290,6 +292,15 @@ const examService = {
     return await ExamAttempt.find({ studentId })
       .populate('testId', 'title totalMarks')
       .select('-answers -questionOrder -optionOrders');
+  },
+
+  async saveSnapshot(studentId, examAttemptId, imageUrl) {
+    const snapshot = await CameraSnapshot.create({
+      studentId,
+      examAttemptId,
+      imageUrl,
+    });
+    return snapshot;
   },
 };
 

@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const { Admin, Student } = require('../models');
 
+const activeTokens = new Map();
+
 const protect = async (req, res, next) => {
   let token;
 
@@ -29,10 +31,38 @@ const protect = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'User not found' });
     }
 
+    if (decoded.role === 'student') {
+      const tokenKey = `${decoded.id}`;
+      const existingToken = activeTokens.get(tokenKey);
+
+      if (existingToken && existingToken !== token) {
+        activeTokens.set(tokenKey, token);
+      } else if (!existingToken) {
+        activeTokens.set(tokenKey, token);
+      }
+    }
+
     next();
   } catch (error) {
     return res.status(401).json({ success: false, message: 'Not authorized, token failed' });
   }
+};
+
+const checkActiveSession = (req, res, next) => {
+  if (req.userRole === 'student') {
+    const tokenKey = `${req.user._id}`;
+    const currentToken = req.headers.authorization?.split(' ')[1];
+    const storedToken = activeTokens.get(tokenKey);
+
+    if (storedToken && storedToken !== currentToken) {
+      return res.status(401).json({
+        success: false,
+        message: 'Another session is active. Please login again.',
+        sessionConflict: true,
+      });
+    }
+  }
+  next();
 };
 
 const authorize = (...roles) => {
@@ -44,4 +74,4 @@ const authorize = (...roles) => {
   };
 };
 
-module.exports = { protect, authorize };
+module.exports = { protect, authorize, checkActiveSession };

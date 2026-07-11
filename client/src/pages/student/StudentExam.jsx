@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import useExamSecurity from '../../hooks/useExamSecurity';
 
 export default function StudentExam() {
   const { attemptId } = useParams();
@@ -13,32 +14,63 @@ export default function StudentExam() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [terminated, setTerminated] = useState(false);
 
   const timerRef = useRef(null);
-  const autoSaveTimerRef = useRef(null);
   const fetchedRef = useRef(false);
+
+  const handleTerminate = useCallback((reason) => {
+    setTerminated(true);
+    clearInterval(timerRef.current);
+    setTimeout(() => {
+      navigate('/student/dashboard', {
+        state: { message: `Exam terminated: ${reason.replace(/_/g, ' ')}` },
+      });
+    }, 2000);
+  }, [navigate]);
+
+  const {
+    violations,
+    cameraActive,
+    warning,
+    enterFullscreen,
+    startCamera,
+    stopCamera,
+    terminateExam,
+  } = useExamSecurity(attemptId, handleTerminate);
 
   const fetchExamData = useCallback(async () => {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
     try {
       const { data } = await api.get(`/exam/data/${attemptId}`);
+      if (data.data.attempt.status === 'terminated') {
+        setTerminated(true);
+        setError('This exam has been terminated.');
+        setLoading(false);
+        return;
+      }
       setExamData(data.data);
       setAnswers(data.data.answers || {});
       setTimeRemaining(data.data.timeRemaining);
       setLoading(false);
+      enterFullscreen();
+      startCamera();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load exam');
       setLoading(false);
     }
-  }, [attemptId]);
+  }, [attemptId, enterFullscreen, startCamera]);
 
   useEffect(() => {
     fetchExamData();
-  }, [fetchExamData]);
+    return () => {
+      stopCamera();
+    };
+  }, [fetchExamData, stopCamera]);
 
   useEffect(() => {
-    if (timeRemaining <= 0 && examData && !submitting) {
+    if (timeRemaining <= 0 && examData && !submitting && !terminated) {
       handleAutoSubmit();
     }
     timerRef.current = setInterval(() => {
@@ -51,10 +83,10 @@ export default function StudentExam() {
       });
     }, 1000);
     return () => clearInterval(timerRef.current);
-  }, [examData?.attempt?._id]);
+  }, [examData?.attempt?._id, terminated]);
 
   const handleAutoSubmit = async () => {
-    if (submitting) return;
+    if (submitting || terminated) return;
     setSubmitting(true);
     clearInterval(timerRef.current);
     try {
@@ -70,11 +102,12 @@ export default function StudentExam() {
     try {
       await api.put(`/exam/save-answer/${attemptId}`, { questionId, selectedOption });
     } catch {
-      // silent fail - will retry on next save
+      // silent fail
     }
   };
 
   const handleSubmit = async () => {
+    if (terminated) return;
     const answeredCount = Object.keys(answers).length;
     const total = examData?.questions?.length || 0;
     const unanswered = total - answeredCount;
@@ -94,6 +127,11 @@ export default function StudentExam() {
       alert(err.response?.data?.message || 'Failed to submit');
       setSubmitting(false);
     }
+  };
+
+  const handleTerminateClick = async () => {
+    if (!window.confirm('Are you sure you want to terminate this exam? This action cannot be undone.')) return;
+    await terminateExam('student自愿');
   };
 
   const formatTime = (seconds) => {
@@ -116,11 +154,19 @@ export default function StudentExam() {
     );
   }
 
-  if (error) {
+  if (error || terminated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="bg-white rounded-xl shadow-sm p-8 max-w-md text-center">
-          <p className="text-red-600 mb-4">{error}</p>
+          {terminated && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-600 font-semibold">Exam Terminated</p>
+              <p className="text-red-500 text-sm mt-1">
+                Your exam has been terminated due to security violations.
+              </p>
+            </div>
+          )}
+          <p className="text-red-600 mb-4">{error || 'Exam terminated'}</p>
           <button onClick={() => navigate('/student/dashboard')}
             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
             Back to Dashboard
@@ -144,6 +190,13 @@ export default function StudentExam() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Security Warning */}
+      {warning && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-white px-4 py-2 text-center text-sm font-semibold">
+          {warning}
+        </div>
+      )}
+
       {/* Top Bar */}
       <div className="bg-white shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
@@ -152,6 +205,15 @@ export default function StudentExam() {
             <p className="text-xs text-gray-500">Question {currentQ + 1} of {questions.length}</p>
           </div>
           <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${cameraActive ? 'bg-green-500' : 'bg-red-500'}`}></span>
+              <span className="text-xs text-gray-500">Camera {cameraActive ? 'On' : 'Off'}</span>
+            </div>
+            {violations > 0 && (
+              <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
+                {violations} violation{violations !== 1 ? 's' : ''}
+              </span>
+            )}
             <span className="text-sm text-gray-500">{answeredCount}/{questions.length} answered</span>
             <div className={`text-lg font-mono font-bold px-4 py-1 rounded-lg ${
               timeRemaining <= 60 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-800'
@@ -160,10 +222,17 @@ export default function StudentExam() {
             </div>
             <button
               onClick={handleSubmit}
-              disabled={submitting}
+              disabled={submitting || terminated}
               className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50"
             >
               {submitting ? 'Submitting...' : 'Submit Exam'}
+            </button>
+            <button
+              onClick={handleTerminateClick}
+              disabled={submitting || terminated}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+            >
+              Terminate
             </button>
           </div>
         </div>

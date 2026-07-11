@@ -71,3 +71,16 @@ exports.getMyAttempts = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.saveSnapshot = async (req, res, next) => {
+  try {
+    const snapshot = await examService.saveSnapshot(
+      req.user._id,
+      req.body.examAttemptId,
+      req.body.imageUrl
+    );
+    sendResponse(res, 200, snapshot, 'Snapshot saved');
+  } catch (error) {
+    next(error);
+  }
+};
