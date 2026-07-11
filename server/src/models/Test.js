@@ -11,9 +11,18 @@ const testSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    branch: {
+      type: String,
+      required: [true, 'Branch is required'],
+      trim: true,
+    },
     duration: {
       type: Number,
       required: [true, 'Duration in minutes is required'],
+    },
+    totalQuestions: {
+      type: Number,
+      required: [true, 'Total questions is required'],
     },
     totalMarks: {
       type: Number,
@@ -23,10 +32,25 @@ const testSchema = new mongoose.Schema(
       type: Number,
       required: [true, 'Passing marks is required'],
     },
-    isActive: {
-      type: Boolean,
-      default: false,
+    startDate: {
+      type: Date,
+      required: [true, 'Start date is required'],
     },
+    endDate: {
+      type: Date,
+      required: [true, 'End date is required'],
+    },
+    status: {
+      type: String,
+      enum: ['active', 'inactive'],
+      default: 'inactive',
+    },
+    assignedQuestions: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Question',
+      },
+    ],
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Admin',
