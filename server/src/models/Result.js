@@ -25,6 +25,14 @@ const resultSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    totalCorrectAnswers: {
+      type: Number,
+      default: 0,
+    },
+    totalWrongAnswers: {
+      type: Number,
+      default: 0,
+    },
     isPassed: {
       type: Boolean,
       required: true,
@@ -32,6 +40,10 @@ const resultSchema = new mongoose.Schema(
     percentage: {
       type: Number,
       required: true,
+    },
+    isPublished: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true }

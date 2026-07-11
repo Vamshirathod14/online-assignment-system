@@ -46,12 +46,10 @@ function App() {
         }
       />
       <Route
-        path="/student/exam"
+        path="/student/exam/:attemptId"
         element={
           <ProtectedRoute allowedRole="student">
-            <StudentLayout>
-              <StudentExam />
-            </StudentLayout>
+            <StudentExam />
           </ProtectedRoute>
         }
       />

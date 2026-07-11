@@ -12,6 +12,16 @@ const examAttemptSchema = new mongoose.Schema(
       ref: 'Test',
       required: true,
     },
+    questionOrder: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Question',
+      },
+    ],
+    optionOrders: {
+      type: Map,
+      of: [String],
+    },
     answers: [
       {
         questionId: {

@@ -1,6 +1,14 @@
 const examService = require('../services/examService');
-const resultService = require('../services/resultService');
 const sendResponse = require('../utils/sendResponse');
+
+exports.getAvailableTests = async (req, res, next) => {
+  try {
+    const tests = await examService.getAvailableTests(req.user._id);
+    sendResponse(res, 200, tests);
+  } catch (error) {
+    next(error);
+  }
+};
 
 exports.startExam = async (req, res, next) => {
   try {
@@ -11,20 +19,45 @@ exports.startExam = async (req, res, next) => {
   }
 };
 
-exports.submitExam = async (req, res, next) => {
+exports.getExamData = async (req, res, next) => {
   try {
-    const attempt = await examService.submitExam(req.params.attemptId, req.user._id, req.body.answers);
-    const result = await resultService.calculateAndSaveResult(attempt._id);
-    sendResponse(res, 200, { attempt, result }, 'Exam submitted successfully');
+    const data = await examService.getExamData(req.params.attemptId, req.user._id);
+    sendResponse(res, 200, data);
   } catch (error) {
     next(error);
   }
 };
 
-exports.getAttemptById = async (req, res, next) => {
+exports.autoSaveAnswer = async (req, res, next) => {
   try {
-    const attempt = await examService.getAttemptById(req.params.attemptId);
-    sendResponse(res, 200, attempt);
+    const result = await examService.autoSaveAnswer(
+      req.params.attemptId,
+      req.user._id,
+      req.body.questionId,
+      req.body.selectedOption
+    );
+    sendResponse(res, 200, result, 'Answer saved');
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.submitExam = async (req, res, next) => {
+  try {
+    const result = await examService.submitExam(req.params.attemptId, req.user._id);
+    sendResponse(res, 200, result, 'Exam submitted successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.timeOutExam = async (req, res, next) => {
+  try {
+    const result = await examService.timeOutExam(req.params.attemptId);
+    if (!result) {
+      return sendResponse(res, 200, null, 'Exam already submitted');
+    }
+    sendResponse(res, 200, result, 'Exam timed out and submitted');
   } catch (error) {
     next(error);
   }
@@ -32,7 +65,7 @@ exports.getAttemptById = async (req, res, next) => {
 
 exports.getMyAttempts = async (req, res, next) => {
   try {
-    const attempts = await examService.getAttemptsByStudent(req.user._id);
+    const attempts = await examService.getMyAttempts(req.user._id);
     sendResponse(res, 200, attempts);
   } catch (error) {
     next(error);
