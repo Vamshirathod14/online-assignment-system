@@ -25,7 +25,7 @@ const securityService = {
       .sort({ createdAt: -1 });
   },
 
-  async terminateExam(examAttemptId, studentId, reason = 'manual_termination') {
+  async terminateExam(examAttemptId, studentId, reason = 'manual_termination', violationType, violationDetails = '') {
     const attempt = await ExamAttempt.findOne({ _id: examAttemptId, studentId, status: 'in_progress' });
     if (!attempt) {
       throw ApiError.notFound('No active attempt found');
@@ -35,6 +35,15 @@ const securityService = {
     attempt.status = 'terminated';
     attempt.terminatedReason = reason;
     await attempt.save();
+
+    if (violationType) {
+      await SecurityLog.create({
+        studentId,
+        examAttemptId: attempt._id,
+        violationType,
+        details: violationDetails || reason,
+      });
+    }
 
     const test = await Test.findById(attempt.testId);
     const questionIds = attempt.questionOrder;

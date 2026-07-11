@@ -1,46 +1,40 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import api from '../services/api';
 
-const VIOLATION_THRESHOLD = 5;
-const SNAPSHOT_INTERVAL = 10000;
-
 export default function useExamSecurity(attemptId, onTerminate) {
-  const [violations, setViolations] = useState(0);
   const [cameraActive, setCameraActive] = useState(false);
-  const [warning, setWarning] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const violationCountRef = useRef(0);
   const streamRef = useRef(null);
   const snapshotTimerRef = useRef(null);
+  const securityTriggered = useRef(false);
+  const onTerminateRef = useRef(onTerminate);
+  onTerminateRef.current = onTerminate;
 
-  const logViolation = useCallback(async (type, details = '') => {
-    try {
-      await api.post('/security/log-violation', {
-        examAttemptId: attemptId,
-        violationType: type,
-        details,
-      });
-      violationCountRef.current += 1;
-      setViolations(violationCountRef.current);
+  const triggerTermination = useCallback(async (violationType, details) => {
+    if (securityTriggered.current) return;
+    securityTriggered.current = true;
 
-      if (violationCountRef.current >= VIOLATION_THRESHOLD) {
-        setWarning('Too many violations. Your exam will be terminated.');
-        try {
-          await api.post(`/security/terminate/${attemptId}`, {
-            reason: 'multiple_violations',
-          });
-          if (onTerminate) onTerminate('multiple_violations');
-        } catch {
-          // termination failed
-        }
-      } else {
-        setWarning(`Warning: ${type.replace(/_/g, ' ')} detected. (${violationCountRef.current}/${VIOLATION_THRESHOLD})`);
-        setTimeout(() => setWarning(''), 3000);
-      }
-    } catch {
-      // silent fail for logging
+    if (snapshotTimerRef.current) {
+      clearInterval(snapshotTimerRef.current);
+      snapshotTimerRef.current = null;
     }
-  }, [attemptId, onTerminate]);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+
+    try {
+      await api.post(`/security/terminate/${attemptId}`, {
+        reason: 'Tab Switching Detected',
+        violationType,
+        violationDetails: details,
+      });
+    } catch {
+      // best-effort
+    }
+
+    if (onTerminateRef.current) onTerminateRef.current('Tab Switching Detected');
+  }, [attemptId]);
 
   const requestFullscreen = useCallback(() => {
     const el = document.documentElement;
@@ -60,8 +54,16 @@ export default function useExamSecurity(attemptId, onTerminate) {
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        logViolation('tab_switch', 'Tab became hidden');
+        triggerTermination('tab_switch', 'Tab became hidden');
       }
+    };
+
+    const handleWindowBlur = () => {
+      triggerTermination('window_blur', 'Window lost focus');
+    };
+
+    const handlePageHide = () => {
+      triggerTermination('page_hide', 'Page hidden or unloaded');
     };
 
     const handleFullscreenChange = () => {
@@ -70,84 +72,42 @@ export default function useExamSecurity(attemptId, onTerminate) {
         document.webkitFullscreenElement ||
         document.mozFullScreenElement;
       setIsFullscreen(!!fs);
-      if (!fs) {
-        logViolation('fullscreen_exit', 'Exited fullscreen mode');
-        setTimeout(requestFullscreen, 1000);
-      }
-    };
-
-    const handleCopy = (e) => {
-      e.preventDefault();
-      logViolation('copy_attempt', 'Copy action blocked');
-    };
-
-    const handlePaste = (e) => {
-      e.preventDefault();
-      logViolation('paste_attempt', 'Paste action blocked');
-    };
-
-    const handleContextMenu = (e) => {
-      e.preventDefault();
-      logViolation('right_click', 'Right-click blocked');
-    };
-
-    const handleKeyDown = (e) => {
-      if (
-        e.ctrlKey ||
-        e.metaKey ||
-        e.altKey ||
-        e.key === 'F12' ||
-        e.key === 'F5' ||
-        (e.key >= 'F1' && e.key <= 'F12')
-      ) {
-        if (e.key === 'F5' || (e.ctrlKey && e.key === 'r') || (e.metaKey && e.key === 'r')) {
-          e.preventDefault();
-          logViolation('refresh_attempt', 'Page refresh blocked');
-          return;
-        }
-        if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i'))) {
-          return;
-        }
-        if (e.ctrlKey || e.metaKey || e.altKey) {
-          e.preventDefault();
-          logViolation('keyboard_shortcut', `Shortcut blocked: ${e.key}`);
-        }
+      if (!fs && !securityTriggered.current) {
+        triggerTermination('fullscreen_exit', 'Exited fullscreen mode');
       }
     };
 
     const handleBeforeUnload = (e) => {
       e.preventDefault();
       e.returnValue = '';
+      triggerTermination('beforeunload', 'Page refresh or close attempted');
     };
 
-    const pushState = () => {
+    const handlePopState = () => {
       window.history.pushState(null, '', window.location.href);
+      triggerTermination('popstate', 'Back button navigation detected');
     };
 
     window.history.pushState(null, '', window.location.href);
-    window.addEventListener('popstate', pushState);
+    window.addEventListener('popstate', handlePopState);
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    document.addEventListener('copy', handleCopy);
-    document.addEventListener('paste', handlePaste);
-    document.addEventListener('contextmenu', handleContextMenu);
-    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('pagehide', handlePageHide);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('copy', handleCopy);
-      document.removeEventListener('paste', handlePaste);
-      document.removeEventListener('contextmenu', handleContextMenu);
-      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('pagehide', handlePageHide);
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('popstate', pushState);
+      window.removeEventListener('popstate', handlePopState);
     };
-  }, [attemptId, logViolation, requestFullscreen]);
+  }, [attemptId, triggerTermination]);
 
   const startCamera = useCallback(async () => {
     try {
@@ -168,6 +128,7 @@ export default function useExamSecurity(attemptId, onTerminate) {
       });
 
       snapshotTimerRef.current = setInterval(async () => {
+        if (securityTriggered.current) return;
         try {
           const canvas = document.createElement('canvas');
           canvas.width = 320;
@@ -181,19 +142,17 @@ export default function useExamSecurity(attemptId, onTerminate) {
             imageUrl: imageData,
           });
         } catch {
-          logViolation('camera_disconnect', 'Failed to capture snapshot');
+          // silent
         }
-      }, SNAPSHOT_INTERVAL);
+      }, 10000);
 
       stream.getVideoTracks()[0].onended = () => {
         setCameraActive(false);
-        logViolation('camera_disconnect', 'Camera stream ended');
       };
     } catch {
       setCameraActive(false);
-      logViolation('camera_disconnect', 'Camera access denied or failed');
     }
-  }, [attemptId, logViolation]);
+  }, [attemptId]);
 
   const stopCamera = useCallback(() => {
     if (snapshotTimerRef.current) {
@@ -207,23 +166,11 @@ export default function useExamSecurity(attemptId, onTerminate) {
     setCameraActive(false);
   }, []);
 
-  const terminateExam = useCallback(async (reason = 'manual_termination') => {
-    try {
-      await api.post(`/security/terminate/${attemptId}`, { reason });
-      if (onTerminate) onTerminate(reason);
-    } catch {
-      // termination failed
-    }
-  }, [attemptId, onTerminate]);
-
   return {
-    violations,
     cameraActive,
     isFullscreen,
-    warning,
     enterFullscreen,
     startCamera,
     stopCamera,
-    terminateExam,
   };
 }

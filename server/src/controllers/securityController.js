@@ -39,7 +39,9 @@ exports.terminateExam = async (req, res, next) => {
     const result = await securityService.terminateExam(
       req.params.attemptId,
       req.user._id,
-      req.body.reason || 'manual_termination'
+      req.body.reason || 'manual_termination',
+      req.body.violationType || null,
+      req.body.violationDetails || ''
     );
     sendResponse(res, 200, result, 'Exam terminated');
   } catch (error) {

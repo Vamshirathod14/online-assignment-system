@@ -29,6 +29,7 @@ export default function StudentExam() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [terminated, setTerminated] = useState(false);
+  const [terminatedReason, setTerminatedReason] = useState('');
   const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false);
 
   const timerRef = useRef(null);
@@ -36,23 +37,20 @@ export default function StudentExam() {
 
   const handleTerminate = useCallback((reason) => {
     setTerminated(true);
+    setTerminatedReason(reason);
     clearInterval(timerRef.current);
+    setSubmitting(false);
     setTimeout(() => {
-      navigate('/student/dashboard', {
-        state: { message: `Exam terminated: ${reason.replace(/_/g, ' ')}` },
-      });
-    }, 2000);
+      navigate('/student/results');
+    }, 3000);
   }, [navigate]);
 
   const {
-    violations,
     cameraActive,
     isFullscreen,
-    warning,
     enterFullscreen,
     startCamera,
     stopCamera,
-    terminateExam,
   } = useExamSecurity(attemptId, handleTerminate);
 
   const fetchExamData = useCallback(async () => {
@@ -62,7 +60,7 @@ export default function StudentExam() {
       const { data } = await api.get(`/exam/data/${attemptId}`);
       if (data.data.attempt.status === 'terminated') {
         setTerminated(true);
-        setError('This exam has been terminated.');
+        setTerminatedReason('Exam was terminated');
         setLoading(false);
         return;
       }
@@ -113,6 +111,7 @@ export default function StudentExam() {
   };
 
   const handleSaveAnswer = async (questionId, selectedOption) => {
+    if (terminated) return;
     setAnswers((prev) => ({ ...prev, [questionId]: selectedOption }));
     try {
       await api.put(`/exam/save-answer/${attemptId}`, { questionId, selectedOption });
@@ -123,16 +122,6 @@ export default function StudentExam() {
 
   const handleSubmit = async () => {
     if (terminated) return;
-    const answeredCount = Object.keys(answers).length;
-    const total = examData?.questions?.length || 0;
-    const unanswered = total - answeredCount;
-
-    let msg = 'Are you sure you want to submit?';
-    if (unanswered > 0) {
-      msg = `You have ${unanswered} unanswered question(s). Are you sure you want to submit?`;
-    }
-    if (!window.confirm(msg)) return;
-
     setSubmitting(true);
     clearInterval(timerRef.current);
     try {
@@ -145,8 +134,23 @@ export default function StudentExam() {
   };
 
   const handleTerminateClick = async () => {
-    if (!window.confirm('Are you sure you want to terminate this exam? This action cannot be undone.')) return;
-    await terminateExam('student_voluntary');
+    if (terminated) return;
+    setSubmitting(true);
+    clearInterval(timerRef.current);
+    try {
+      await api.post(`/security/terminate/${attemptId}`, {
+        reason: 'student_voluntary',
+        violationType: 'student_voluntary',
+        violationDetails: 'Student chose to end exam',
+      });
+    } catch {
+      // proceed to termination UI regardless
+    }
+    setTerminated(true);
+    setTerminatedReason('Student ended the exam');
+    setTimeout(() => {
+      navigate('/student/results');
+    }, 3000);
   };
 
   const handleEnterFullscreen = () => {
@@ -191,20 +195,18 @@ export default function StudentExam() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="section-card p-8 max-w-md text-center animate-scale-in">
-          {terminated && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
-              <div className="flex items-center justify-center gap-2 mb-1">
-                <AlertTriangle className="w-5 h-5 text-red-600" />
-                <p className="text-red-600 font-semibold">Exam Terminated</p>
-              </div>
-              <p className="text-red-500 text-sm mt-1">
-                Your exam has been terminated due to security violations.
-              </p>
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <AlertTriangle className="w-5 h-5 text-red-600" />
+              <p className="text-red-600 font-semibold">Exam Terminated</p>
             </div>
-          )}
-          <p className="text-red-600 mb-4 font-medium">{error || 'Exam terminated'}</p>
-          <button onClick={() => navigate('/student/dashboard')} className="btn-primary">
-            Back to Dashboard
+            <p className="text-red-500 text-sm mt-1">
+              Your exam has been terminated because unauthorized navigation was detected.
+            </p>
+          </div>
+          <p className="text-red-600 mb-4 font-medium">{error || 'Redirecting to results...'}</p>
+          <button onClick={() => navigate('/student/results')} className="btn-primary">
+            View Results
           </button>
         </div>
       </div>
@@ -241,16 +243,6 @@ export default function StudentExam() {
         </div>
       )}
 
-      {/* Security Warning */}
-      {warning && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white px-4 py-2.5 text-center text-sm font-semibold animate-fade-in-down shadow-lg">
-          <div className="flex items-center justify-center gap-2">
-            <AlertTriangle className="w-4 h-4" />
-            {warning}
-          </div>
-        </div>
-      )}
-
       {/* Top Bar */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-3">
@@ -269,13 +261,6 @@ export default function StudentExam() {
                 )}
                 <span className="text-xs font-medium text-gray-600">{cameraActive ? 'On' : 'Off'}</span>
               </div>
-
-              {/* Violations */}
-              {violations > 0 && (
-                <span className="badge-danger text-xs">
-                  <AlertTriangle className="w-3 h-3" /> {violations}
-                </span>
-              )}
 
               {/* Progress */}
               <span className="hidden sm:inline text-xs text-gray-500 font-medium">{answeredCount}/{questions.length}</span>
@@ -296,7 +281,7 @@ export default function StudentExam() {
                 <span className="hidden sm:inline">{submitting ? 'Submitting...' : 'Submit'}</span>
               </button>
 
-              {/* Terminate */}
+              {/* End Exam */}
               <button
                 onClick={handleTerminateClick}
                 disabled={submitting || terminated}
@@ -338,10 +323,13 @@ export default function StudentExam() {
                   <button
                     key={opt.label}
                     onClick={() => handleSaveAnswer(question._id, opt.label)}
+                    disabled={terminated}
                     className={`w-full flex items-center gap-4 p-4 border-2 rounded-xl text-left transition-all duration-200 ${
-                      isSelected
-                        ? 'border-primary-500 bg-primary-50 shadow-sm'
-                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      terminated
+                        ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
+                        : isSelected
+                          ? 'border-primary-500 bg-primary-50 shadow-sm'
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                     }`}
                   >
                     <span className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${
@@ -363,7 +351,7 @@ export default function StudentExam() {
             <div className="flex justify-between items-center mt-8 pt-5 border-t border-gray-100">
               <button
                 onClick={() => setCurrentQ((prev) => Math.max(0, prev - 1))}
-                disabled={currentQ === 0}
+                disabled={currentQ === 0 || terminated}
                 className="btn-secondary"
               >
                 <ChevronLeft className="w-4 h-4" /> Previous
@@ -373,7 +361,7 @@ export default function StudentExam() {
               </span>
               <button
                 onClick={() => setCurrentQ((prev) => Math.min(questions.length - 1, prev + 1))}
-                disabled={currentQ === questions.length - 1}
+                disabled={currentQ === questions.length - 1 || terminated}
                 className="btn-primary"
               >
                 Next <ChevronRight className="w-4 h-4" />
@@ -392,7 +380,8 @@ export default function StudentExam() {
                 return (
                   <button
                     key={q._id}
-                    onClick={() => setCurrentQ(idx)}
+                    onClick={() => !terminated && setCurrentQ(idx)}
+                    disabled={terminated}
                     aria-label={`Question ${idx + 1}${status === 'answered' ? ' (answered)' : ''}`}
                     className={`w-10 h-10 rounded-lg text-sm font-semibold transition-all duration-200 ${
                       status === 'current'
