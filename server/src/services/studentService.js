@@ -4,20 +4,40 @@ const bcrypt = require('bcryptjs');
 const generateToken = require('../utils/generateToken');
 
 const studentService = {
-  async register({ name, email, password, rollNumber }) {
-    const existing = await Student.findOne({ $or: [{ email }, { rollNumber }] });
+  async register({ name, collegeName, branch, hallTicket, email, mobileNumber, password }) {
+    const existing = await Student.findOne({ $or: [{ email }, { hallTicket }] });
     if (existing) {
-      throw ApiError.badRequest('Student with this email or roll number already exists');
+      if (existing.email === email) {
+        throw ApiError.badRequest('Student with this email already exists');
+      }
+      throw ApiError.badRequest('Student with this hall ticket already exists');
     }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const student = await Student.create({ name, email, password: hashedPassword, rollNumber });
+    const student = await Student.create({
+      name,
+      collegeName,
+      branch,
+      hallTicket,
+      email,
+      mobileNumber,
+      password: hashedPassword,
+    });
+
     const token = generateToken(student._id, 'student');
 
     return {
-      student: { id: student._id, name: student.name, email: student.email, rollNumber: student.rollNumber },
+      student: {
+        id: student._id,
+        name: student.name,
+        email: student.email,
+        hallTicket: student.hallTicket,
+        collegeName: student.collegeName,
+        branch: student.branch,
+        mobileNumber: student.mobileNumber,
+      },
       token,
     };
   },
@@ -35,7 +55,15 @@ const studentService = {
 
     const token = generateToken(student._id, 'student');
     return {
-      student: { id: student._id, name: student.name, email: student.email, rollNumber: student.rollNumber },
+      student: {
+        id: student._id,
+        name: student.name,
+        email: student.email,
+        hallTicket: student.hallTicket,
+        collegeName: student.collegeName,
+        branch: student.branch,
+        mobileNumber: student.mobileNumber,
+      },
       token,
     };
   },
@@ -48,8 +76,33 @@ const studentService = {
     return student;
   },
 
-  async getAllStudents() {
-    return await Student.find().select('-__v');
+  async getAllStudents(search) {
+    let query = {};
+    if (search) {
+      query = {
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+          { hallTicket: { $regex: search, $options: 'i' } },
+          { collegeName: { $regex: search, $options: 'i' } },
+          { branch: { $regex: search, $options: 'i' } },
+          { mobileNumber: { $regex: search, $options: 'i' } },
+        ],
+      };
+    }
+    return await Student.find(query).select('-__v').sort({ createdAt: -1 });
+  },
+
+  async deleteStudent(id) {
+    const student = await Student.findByIdAndDelete(id);
+    if (!student) {
+      throw ApiError.notFound('Student not found');
+    }
+    return student;
+  },
+
+  async getStudentCount() {
+    return await Student.countDocuments();
   },
 };
 

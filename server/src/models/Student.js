@@ -7,6 +7,22 @@ const studentSchema = new mongoose.Schema(
       required: [true, 'Name is required'],
       trim: true,
     },
+    collegeName: {
+      type: String,
+      required: [true, 'College name is required'],
+      trim: true,
+    },
+    branch: {
+      type: String,
+      required: [true, 'Branch is required'],
+      trim: true,
+    },
+    hallTicket: {
+      type: String,
+      required: [true, 'Hall ticket number is required'],
+      unique: true,
+      trim: true,
+    },
     email: {
       type: String,
       required: [true, 'Email is required'],
@@ -14,17 +30,17 @@ const studentSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
+    mobileNumber: {
+      type: String,
+      required: [true, 'Mobile number is required'],
+      trim: true,
+      match: [/^[6-9]\d{9}$/, 'Please enter a valid 10-digit Indian mobile number'],
+    },
     password: {
       type: String,
       required: [true, 'Password is required'],
       minlength: 6,
       select: false,
-    },
-    rollNumber: {
-      type: String,
-      required: [true, 'Roll number is required'],
-      unique: true,
-      trim: true,
     },
     role: {
       type: String,
