@@ -7,18 +7,24 @@ const questionService = {
     return await Question.create(data);
   },
 
-  async getAll(search) {
+  async getAll({ search, subject, difficulty, questionType, marks, sortBy }) {
     let query = {};
     if (search) {
-      query = {
-        $or: [
-          { questionText: { $regex: search, $options: 'i' } },
-          { subject: { $regex: search, $options: 'i' } },
-          { difficulty: { $regex: search, $options: 'i' } },
-        ],
-      };
+      query.$or = [
+        { questionText: { $regex: search, $options: 'i' } },
+        { subject: { $regex: search, $options: 'i' } },
+      ];
     }
-    return await Question.find(query).select('-__v').sort({ createdAt: -1 });
+    if (subject) query.subject = subject;
+    if (difficulty) query.difficulty = difficulty;
+    if (questionType) query.questionType = questionType;
+    if (marks) query.marks = Number(marks);
+
+    let sort = { createdAt: -1 };
+    if (sortBy === 'oldest') sort = { createdAt: 1 };
+    else if (sortBy === 'difficulty') sort = { difficulty: 1 };
+
+    return await Question.find(query).select('-__v').sort(sort);
   },
 
   async getByTestId(testId) {
@@ -115,6 +121,65 @@ const questionService = {
 
   async getSubjects() {
     return await Question.distinct('subject');
+  },
+
+  async bulkDelete(ids) {
+    const result = await Question.deleteMany({ _id: { $in: ids } });
+    return { deleted: result.deletedCount };
+  },
+
+  async duplicate(id) {
+    const question = await Question.findById(id);
+    if (!question) throw ApiError.notFound('Question not found');
+    const obj = question.toObject();
+    delete obj._id;
+    delete obj.createdAt;
+    delete obj.updatedAt;
+    obj.questionText = obj.questionText + ' (Copy)';
+    return await Question.create(obj);
+  },
+
+  async exportQuestions({ subject, difficulty, questionType }) {
+    let query = {};
+    if (subject) query.subject = subject;
+    if (difficulty) query.difficulty = difficulty;
+    if (questionType) query.questionType = questionType;
+
+    const questions = await Question.find(query).select('-__v -createdBy').sort({ createdAt: -1 });
+
+    const exportData = questions.map((q, i) => {
+      const row = {
+        'S.No': i + 1,
+        'Question': q.questionText,
+        'Type': q.questionType,
+        'Subject': q.subject,
+        'Difficulty': q.difficulty,
+        'Marks': q.marks,
+      };
+      if (q.questionType === 'mcq' || q.questionType === 'true_false') {
+        row['Option A'] = q.options?.[0]?.text || '';
+        row['Option B'] = q.options?.[1]?.text || '';
+        row['Option C'] = q.options?.[2]?.text || '';
+        row['Option D'] = q.options?.[3]?.text || '';
+        row['Correct Answer'] = q.correctOption || '';
+      } else if (q.questionType === 'multiple_select') {
+        row['Options'] = (q.options || []).map(o => `${o.label}: ${o.text}`).join(' | ');
+        row['Correct Options'] = (q.correctOptions || []).join(', ');
+      } else if (q.questionType === 'fill_blank') {
+        row['Correct Answers'] = (q.correctAnswers || []).join(', ');
+      } else if (q.questionType === 'coding') {
+        row['Language'] = q.language || '';
+        row['Starter Code'] = q.starterCode || '';
+        row['Input Example'] = q.inputExample || '';
+        row['Output Example'] = q.outputExample || '';
+      }
+      return row;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Questions');
+    return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
   },
 };
 

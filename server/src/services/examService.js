@@ -214,8 +214,31 @@ const examService = {
 
     for (const answer of attempt.answers) {
       const q = questionMap[answer.questionId.toString()];
-      if (q && q.correctOption === answer.selectedOption) {
-        totalCorrect++;
+      if (!q) continue;
+      
+      const selected = answer.selectedOption;
+      if (!selected) continue;
+      
+      switch (q.questionType) {
+        case 'mcq':
+        case 'true_false':
+          if (q.correctOption === selected) totalCorrect++;
+          break;
+        case 'multiple_select': {
+          const selectedArr = selected.split(',').map(s => s.trim()).sort();
+          const correctArr = (q.correctOptions || []).sort();
+          if (JSON.stringify(selectedArr) === JSON.stringify(correctArr)) totalCorrect++;
+          break;
+        }
+        case 'fill_blank': {
+          const acceptedAnswers = (q.correctAnswers || []).map(a => a.toLowerCase().trim());
+          if (acceptedAnswers.includes(selected.toLowerCase().trim())) totalCorrect++;
+          break;
+        }
+        case 'descriptive':
+          break;
+        case 'coding':
+          break;
       }
     }
 
@@ -263,8 +286,31 @@ const examService = {
 
     for (const answer of attempt.answers) {
       const q = questionMap[answer.questionId.toString()];
-      if (q && q.correctOption === answer.selectedOption) {
-        totalCorrect++;
+      if (!q) continue;
+      
+      const selected = answer.selectedOption;
+      if (!selected) continue;
+      
+      switch (q.questionType) {
+        case 'mcq':
+        case 'true_false':
+          if (q.correctOption === selected) totalCorrect++;
+          break;
+        case 'multiple_select': {
+          const selectedArr = selected.split(',').map(s => s.trim()).sort();
+          const correctArr = (q.correctOptions || []).sort();
+          if (JSON.stringify(selectedArr) === JSON.stringify(correctArr)) totalCorrect++;
+          break;
+        }
+        case 'fill_blank': {
+          const acceptedAnswers = (q.correctAnswers || []).map(a => a.toLowerCase().trim());
+          if (acceptedAnswers.includes(selected.toLowerCase().trim())) totalCorrect++;
+          break;
+        }
+        case 'descriptive':
+          break;
+        case 'coding':
+          break;
       }
     }
 

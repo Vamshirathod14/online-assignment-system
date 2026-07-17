@@ -118,40 +118,64 @@ const analyticsService = {
       ExamAttempt.aggregate([
         { $unwind: '$answers' },
         {
-          $group: {
-            _id: '$answers.questionId',
-            totalAttempts: { $sum: 1 },
-            correctCount: {
-              $sum: {
-                $cond: ['$answers.isCorrect', 1, 0],
+          $lookup: {
+            from: 'questions',
+            localField: 'answers.questionId',
+            foreignField: '_id',
+            as: 'question',
+          },
+        },
+        { $unwind: { path: '$question', preserveNullAndEmptyArrays: false } },
+        {
+          $addFields: {
+            'answers.isCorrect': {
+              $switch: {
+                branches: [
+                  {
+                    case: { $in: ['$question.questionType', ['mcq', 'true_false']] },
+                    then: { $eq: ['$answers.selectedOption', '$question.correctOption'] },
+                  },
+                  {
+                    case: { $eq: ['$question.questionType', 'fill_blank'] },
+                    then: {
+                      $in: [
+                        { $toLower: { $trim: { input: '$answers.selectedOption' } } },
+                        { $map: { input: '$question.correctAnswers', as: 'a', in: { $toLower: { $trim: { input: '$$a' } } } } },
+                      ],
+                    },
+                  },
+                ],
+                default: false,
               },
             },
           },
         },
         {
-          $lookup: {
-            from: 'questions',
-            localField: '_id',
-            foreignField: '_id',
-            as: 'question',
+          $group: {
+            _id: '$question._id',
+            questionText: { $first: '$question.questionText' },
+            questionType: { $first: '$question.questionType' },
+            totalAttempts: { $sum: 1 },
+            correctCount: { $sum: { $cond: ['$answers.isCorrect', 1, 0] } },
           },
         },
-        { $unwind: { path: '$question', preserveNullAndEmptyArrays: true } },
         {
           $project: {
-            questionText: '$question.questionText',
+            questionText: 1,
+            questionType: 1,
             totalAttempts: 1,
             correctCount: 1,
             accuracy: {
               $cond: [
                 { $gt: ['$totalAttempts', 0] },
-                { $multiply: [{ $divide: ['$correctCount', '$totalAttempts'] }, 100] },
+                { $round: [{ $multiply: [{ $divide: ['$correctCount', '$totalAttempts'] }, 100] }, 1] },
                 0,
               ],
             },
           },
         },
         { $sort: { accuracy: -1 } },
+        { $limit: 20 },
       ]),
       Student.aggregate([
         {
@@ -208,8 +232,35 @@ const analyticsService = {
       count: d.count,
     }));
 
+    const testWiseAvg = await Result.aggregate([
+      {
+        $lookup: {
+          from: 'tests',
+          localField: 'testId',
+          foreignField: '_id',
+          as: 'test',
+        },
+      },
+      { $unwind: { path: '$test', preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: '$test.title',
+          avgPercentage: { $avg: '$percentage' },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { count: -1 } },
+      { $limit: 10 },
+    ]);
+
+    const avgMarks = testWiseAvg.map(t => ({
+      test: t._id || 'Unknown',
+      avgMarks: Math.round((t.avgPercentage || 0) * 100) / 100,
+      count: t.count,
+    }));
+
     return {
-      avgMarks: departments,
+      avgMarks,
       passFail: passObj,
       departments,
       completedVsTerminated,

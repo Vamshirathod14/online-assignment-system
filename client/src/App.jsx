@@ -19,6 +19,7 @@ const AdminStudents = lazy(() => import('./pages/admin/AdminStudents'));
 const AdminTests = lazy(() => import('./pages/admin/AdminTests'));
 const AdminQuestions = lazy(() => import('./pages/admin/AdminQuestions'));
 const AdminResults = lazy(() => import('./pages/admin/AdminResults'));
+const AdminTestDetails = lazy(() => import('./pages/admin/AdminTestDetails'));
 const AdminColleges = lazy(() => import('./pages/admin/AdminColleges'));
 const StudentForgotPassword = lazy(() => import('./pages/student/ForgotPassword'));
 const AdminForgotPassword = lazy(() => import('./pages/admin/ForgotPassword'));
@@ -128,6 +129,16 @@ function App() {
             <ProtectedRoute allowedRole="admin">
               <AdminLayout>
                 <AdminQuestions />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/tests/:id"
+          element={
+            <ProtectedRoute allowedRole="admin">
+              <AdminLayout>
+                <AdminTestDetails />
               </AdminLayout>
             </ProtectedRoute>
           }

@@ -12,5 +12,6 @@ router.delete('/:id', protect, authorize('admin'), testController.delete);
 router.put('/:id/toggle-status', protect, authorize('admin'), testController.toggleStatus);
 router.put('/:id/assign-manual', protect, authorize('admin'), testController.assignQuestionsManual);
 router.put('/:id/assign-random', protect, authorize('admin'), testController.assignQuestionsRandom);
+router.get('/:id/stats', protect, authorize('admin'), testController.getTestStats);
 
 module.exports = router;

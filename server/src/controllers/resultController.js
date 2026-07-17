@@ -94,6 +94,15 @@ exports.getExamHistory = async (req, res, next) => {
   }
 };
 
+exports.getTestWiseResults = async (req, res, next) => {
+  try {
+    const data = await resultService.getTestWiseResults();
+    sendResponse(res, 200, data);
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.exportResultsCSV = async (req, res, next) => {
   try {
     const csvString = await resultService.exportCSV(req.query);

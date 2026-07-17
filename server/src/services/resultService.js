@@ -1,4 +1,4 @@
-const { Result, ExamAttempt, SecurityLog } = require('../models');
+const { Result, ExamAttempt, SecurityLog, Test } = require('../models');
 const ApiError = require('../utils/ApiError');
 const XLSX = require('xlsx');
 
@@ -181,6 +181,40 @@ const resultService = {
 
     const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
     return buffer;
+  },
+
+  async getTestWiseResults() {
+    const tests = await Test.find().sort({ createdAt: -1 });
+    const testStats = [];
+
+    for (const test of tests) {
+      const results = await Result.find({ testId: test._id });
+      const attempts = await ExamAttempt.find({ testId: test._id });
+
+      testStats.push({
+        test: {
+          _id: test._id,
+          title: test.title,
+          branch: test.branch,
+          duration: test.duration,
+          totalMarks: test.totalMarks,
+          passingMarks: test.passingMarks,
+          startDate: test.startDate,
+          endDate: test.endDate,
+          status: test.status,
+        },
+        totalAttempts: attempts.length,
+        completedAttempts: attempts.filter(a => a.status === 'completed' || a.status === 'timed_out').length,
+        totalResults: results.length,
+        passed: results.filter(r => r.isPassed).length,
+        failed: results.filter(r => !r.isPassed).length,
+        averageScore: results.length > 0 ? Math.round(results.reduce((sum, r) => sum + r.percentage, 0) / results.length * 100) / 100 : 0,
+        highestScore: results.length > 0 ? Math.max(...results.map(r => r.percentage)) : 0,
+        lowestScore: results.length > 0 ? Math.min(...results.map(r => r.percentage)) : 0,
+      });
+    }
+
+    return testStats;
   },
 
   async getExamHistory(studentId) {

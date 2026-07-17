@@ -12,5 +12,8 @@ router.get('/', protect, questionController.getAll);
 router.get('/:id', protect, questionController.getById);
 router.put('/:id', protect, authorize('admin'), questionController.update);
 router.delete('/:id', protect, authorize('admin'), questionController.delete);
+router.post('/bulk-delete', protect, authorize('admin'), questionController.bulkDelete);
+router.post('/duplicate/:id', protect, authorize('admin'), questionController.duplicate);
+router.get('/export', protect, authorize('admin'), questionController.exportQuestions);
 
 module.exports = router;

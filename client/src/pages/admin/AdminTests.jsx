@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
-import { Search, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, ClipboardList, X } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, ClipboardList, X, BarChart3 } from 'lucide-react';
 import { DEPARTMENTS } from '../../constants/departments';
 
 const initialFormData = {
@@ -17,6 +18,7 @@ const initialFormData = {
 };
 
 export default function AdminTests() {
+  const navigate = useNavigate();
   const [tests, setTests] = useState([]);
   const [questions, setQuestions] = useState([]);
   const [search, setSearch] = useState('');
@@ -411,6 +413,10 @@ export default function AdminTests() {
                     </td>
                     <td className="table-cell">
                       <div className="flex gap-1">
+                        <button onClick={() => navigate(`/admin/tests/${test._id}`)}
+                          className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="View Details">
+                          <BarChart3 className="w-3.5 h-3.5" />
+                        </button>
                         <button onClick={() => handleEdit(test)} className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="Edit">
                           <Pencil className="w-3.5 h-3.5" />
                         </button>

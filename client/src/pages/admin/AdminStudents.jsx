@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'react-toastify';
 import api from '../../services/api';
 import { Users, Search, Download, Trash2, UserX } from 'lucide-react';
 
@@ -32,7 +33,7 @@ export default function AdminStudents() {
       await api.delete(`/students/${id}`);
       setStudents(students.filter((s) => s._id !== id));
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete student');
+      toast.error(err.response?.data?.message || 'Failed to delete student');
     } finally {
       setDeletingId(null);
     }
@@ -54,7 +55,7 @@ export default function AdminStudents() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch {
-      alert('Failed to export students');
+      toast.error('Failed to export students');
     }
   };
 

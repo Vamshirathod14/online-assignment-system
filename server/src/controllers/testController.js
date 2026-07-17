@@ -82,3 +82,12 @@ exports.getTestCount = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.getTestStats = async (req, res, next) => {
+  try {
+    const data = await testService.getTestStats(req.params.id);
+    sendResponse(res, 200, data);
+  } catch (error) {
+    next(error);
+  }
+};
