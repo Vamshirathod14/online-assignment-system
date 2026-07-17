@@ -48,23 +48,6 @@ const protect = async (req, res, next) => {
   }
 };
 
-const checkActiveSession = (req, res, next) => {
-  if (req.userRole === 'student') {
-    const tokenKey = `${req.user._id}`;
-    const currentToken = req.headers.authorization?.split(' ')[1];
-    const storedToken = activeTokens.get(tokenKey);
-
-    if (storedToken && storedToken !== currentToken) {
-      return res.status(401).json({
-        success: false,
-        message: 'Another session is active. Please login again.',
-        sessionConflict: true,
-      });
-    }
-  }
-  next();
-};
-
 const authorize = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.userRole)) {
@@ -74,4 +57,4 @@ const authorize = (...roles) => {
   };
 };
 
-module.exports = { protect, authorize, checkActiveSession };
+module.exports = { protect, authorize };

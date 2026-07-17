@@ -5,15 +5,11 @@ import {
   Users,
   ClipboardList,
   HelpCircle,
-  BarChart3,
-  CheckCircle2,
-  AlertTriangle,
   Target,
   TrendingUp,
   Award,
   Shield,
   Activity,
-  BookOpen,
 } from 'lucide-react';
 import {
   Chart as ChartJS,

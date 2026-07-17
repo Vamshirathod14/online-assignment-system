@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
-import { Search, Plus, Upload, Pencil, Trash2, HelpCircle, X, Download, Copy, Filter, ChevronDown, CheckSquare } from 'lucide-react';
+import { Search, Plus, Upload, Pencil, Trash2, HelpCircle, X, Download, Copy, Filter, CheckSquare } from 'lucide-react';
 
 const QUESTION_TYPES = [
   { value: 'mcq', label: 'MCQ (Single Choice)' },

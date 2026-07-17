@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import {
-  ArrowLeft, Clock, Calendar, Target, Users, HelpCircle,
-  BarChart3, CheckCircle2, AlertTriangle, Trash2, Pencil, Copy,
-  Eye, EyeOff, BookOpen
+  ArrowLeft, Clock, Target, Users, HelpCircle,
+  AlertTriangle, Trash2, Pencil, Copy, Eye, BookOpen
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 

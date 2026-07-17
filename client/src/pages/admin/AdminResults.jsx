@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import {
   Search, Download, Eye, EyeOff, CheckCircle2, X, AlertTriangle,
-  RefreshCw, BarChart3, Users, Award, Clock, ChevronLeft, Trophy,
-  TrendingUp, ArrowDownRight, ArrowUpRight
+  RefreshCw, BarChart3, ChevronLeft
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 

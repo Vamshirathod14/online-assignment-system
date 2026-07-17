@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
-import { Users, Search, Download, Trash2, UserX } from 'lucide-react';
+import { Search, Download, Trash2, UserX } from 'lucide-react';
 
 export default function AdminStudents() {
   const [students, setStudents] = useState([]);
