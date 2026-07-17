@@ -37,7 +37,7 @@ export default function StudentLayout({ children }) {
             <div className="flex items-center gap-8">
               <Link to="/student/dashboard" className="flex items-center gap-2 text-xl font-bold text-primary-600">
                 <GraduationCap className="w-6 h-6" />
-                <span>OAS</span>
+                <span>CoreSoft</span>
               </Link>
               <div className="hidden md:flex items-center gap-1">
                 {navItems.map((item) => {
@@ -129,6 +129,9 @@ export default function StudentLayout({ children }) {
         )}
       </nav>
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</main>
+      <footer className="border-t border-gray-100 bg-white py-4 text-center text-xs text-gray-400">
+        Designed &amp; Developed by <span className="font-semibold text-gray-500">V Soft</span> &middot; Crafting Code. Powering Ideas.
+      </footer>
     </div>
   );
 }

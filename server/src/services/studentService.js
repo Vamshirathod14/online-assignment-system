@@ -3,8 +3,10 @@ const ApiError = require('../utils/ApiError');
 const bcrypt = require('bcryptjs');
 const generateToken = require('../utils/generateToken');
 
+const toTitleCase = (str) => str.replace(/\b\w/g, (c) => c.toUpperCase());
+
 const studentService = {
-  async register({ name, collegeName, branch, hallTicket, email, mobileNumber, password }) {
+  async register({ name, fatherName, collegeName, branch, hallTicket, email, mobileNumber, password }) {
     const existing = await Student.findOne({ $or: [{ email }, { hallTicket }] });
     if (existing) {
       if (existing.email === email) {
@@ -17,8 +19,9 @@ const studentService = {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const student = await Student.create({
-      name,
-      collegeName,
+      name: toTitleCase(name),
+      fatherName: fatherName ? toTitleCase(fatherName) : undefined,
+      collegeName: collegeName ? toTitleCase(collegeName) : collegeName,
       branch,
       hallTicket,
       email,
@@ -32,6 +35,7 @@ const studentService = {
       student: {
         id: student._id,
         name: student.name,
+        fatherName: student.fatherName,
         email: student.email,
         hallTicket: student.hallTicket,
         collegeName: student.collegeName,
@@ -58,6 +62,7 @@ const studentService = {
       student: {
         id: student._id,
         name: student.name,
+        fatherName: student.fatherName,
         email: student.email,
         hallTicket: student.hallTicket,
         collegeName: student.collegeName,

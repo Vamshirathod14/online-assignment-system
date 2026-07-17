@@ -2,6 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import { Search, Plus, Upload, Pencil, Trash2, HelpCircle, X } from 'lucide-react';
 
+const QUESTION_TYPES = [
+  { value: 'mcq', label: 'MCQ (Single Choice)' },
+  { value: 'multiple_select', label: 'Multiple Select' },
+  { value: 'true_false', label: 'True / False' },
+  { value: 'fill_blank', label: 'Fill in the Blank' },
+  { value: 'descriptive', label: 'Descriptive' },
+  { value: 'coding', label: 'Coding' },
+];
+
 const initialQuestion = {
   questionText: '',
   questionType: 'mcq',
@@ -10,9 +19,16 @@ const initialQuestion = {
   optionC: '',
   optionD: '',
   correctOption: 'A',
+  correctOptions: [],
+  correctAnswer: '',
   difficulty: 'medium',
-
   subject: '',
+  language: '',
+  starterCode: '',
+  inputExample: '',
+  outputExample: '',
+  memoryLimit: '256',
+  timeLimit: '1000',
 };
 
 export default function AdminQuestions() {
@@ -50,14 +66,52 @@ export default function AdminQuestions() {
     if (errors[e.target.name]) setErrors({ ...errors, [e.target.name]: '' });
   };
 
+  const handleTypeChange = (e) => {
+    const newType = e.target.value;
+    setFormData({ ...initialQuestion, questionType: newType, questionText: formData.questionText, difficulty: formData.difficulty, subject: formData.subject });
+    setErrors({});
+  };
+
+  const handleMultiSelectOption = (label) => {
+    setFormData((prev) => {
+      const current = prev.correctOptions || [];
+      const updated = current.includes(label)
+        ? current.filter((l) => l !== label)
+        : [...current, label];
+      return { ...prev, correctOptions: updated };
+    });
+  };
+
+  const showOptions = ['mcq', 'multiple_select', 'true_false'].includes(formData.questionType);
+  const showCorrectOption = formData.questionType === 'mcq' || formData.questionType === 'true_false';
+  const showMultiCorrect = formData.questionType === 'multiple_select';
+  const showCorrectAnswer = formData.questionType === 'fill_blank';
+  const showCodingFields = formData.questionType === 'coding';
+
   const validate = () => {
     const newErrors = {};
     if (!formData.questionText.trim()) newErrors.questionText = 'Question text is required';
-    if (!formData.optionA.trim()) newErrors.optionA = 'Option A is required';
-    if (!formData.optionB.trim()) newErrors.optionB = 'Option B is required';
-    if (!formData.optionC.trim()) newErrors.optionC = 'Option C is required';
-    if (!formData.optionD.trim()) newErrors.optionD = 'Option D is required';
     if (!formData.subject.trim()) newErrors.subject = 'Subject is required';
+
+    if (formData.questionType === 'mcq') {
+      if (!formData.optionA.trim()) newErrors.optionA = 'Option A is required';
+      if (!formData.optionB.trim()) newErrors.optionB = 'Option B is required';
+      if (!formData.optionC.trim()) newErrors.optionC = 'Option C is required';
+      if (!formData.optionD.trim()) newErrors.optionD = 'Option D is required';
+    } else if (formData.questionType === 'multiple_select') {
+      if (!formData.optionA.trim()) newErrors.optionA = 'Option A is required';
+      if (!formData.optionB.trim()) newErrors.optionB = 'Option B is required';
+      if (!formData.optionC.trim()) newErrors.optionC = 'Option C is required';
+      if (!formData.optionD.trim()) newErrors.optionD = 'Option D is required';
+      if (!formData.correctOptions || formData.correctOptions.length === 0) {
+        newErrors.correctOptions = 'Select at least one correct option';
+      }
+    } else if (formData.questionType === 'fill_blank') {
+      if (!formData.correctAnswer.trim()) newErrors.correctAnswer = 'Correct answer is required';
+    } else if (formData.questionType === 'coding') {
+      if (!formData.language.trim()) newErrors.language = 'Language is required';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -67,19 +121,45 @@ export default function AdminQuestions() {
     setApiError('');
     if (!validate()) return;
 
-    const payload = {
+    let payload = {
       questionText: formData.questionText,
       questionType: formData.questionType,
-      options: [
+      difficulty: formData.difficulty,
+      subject: formData.subject,
+    };
+
+    if (formData.questionType === 'mcq') {
+      payload.options = [
         { label: 'A', text: formData.optionA },
         { label: 'B', text: formData.optionB },
         { label: 'C', text: formData.optionC },
         { label: 'D', text: formData.optionD },
-      ],
-      correctOption: formData.correctOption,
-      difficulty: formData.difficulty,
-      subject: formData.subject,
-    };
+      ];
+      payload.correctOption = formData.correctOption;
+    } else if (formData.questionType === 'multiple_select') {
+      payload.options = [
+        { label: 'A', text: formData.optionA },
+        { label: 'B', text: formData.optionB },
+        { label: 'C', text: formData.optionC },
+        { label: 'D', text: formData.optionD },
+      ];
+      payload.correctOptions = formData.correctOptions;
+    } else if (formData.questionType === 'true_false') {
+      payload.options = [
+        { label: 'A', text: 'True' },
+        { label: 'B', text: 'False' },
+      ];
+      payload.correctOption = formData.correctOption;
+    } else if (formData.questionType === 'fill_blank') {
+      payload.correctAnswer = formData.correctAnswer;
+    } else if (formData.questionType === 'coding') {
+      payload.language = formData.language;
+      payload.starterCode = formData.starterCode;
+      payload.inputExample = formData.inputExample;
+      payload.outputExample = formData.outputExample;
+      payload.memoryLimit = parseInt(formData.memoryLimit) || 256;
+      payload.timeLimit = parseInt(formData.timeLimit) || 1000;
+    }
 
     try {
       if (editingId) {
@@ -98,7 +178,9 @@ export default function AdminQuestions() {
 
   const handleEdit = (q) => {
     const optMap = {};
-    q.options.forEach((o) => { optMap[o.label] = o.text; });
+    if (q.options) {
+      q.options.forEach((o) => { optMap[o.label] = o.text; });
+    }
     setFormData({
       questionText: q.questionText,
       questionType: q.questionType || 'mcq',
@@ -106,10 +188,17 @@ export default function AdminQuestions() {
       optionB: optMap['B'] || '',
       optionC: optMap['C'] || '',
       optionD: optMap['D'] || '',
-      correctOption: q.correctOption,
+      correctOption: q.correctOption || 'A',
+      correctOptions: q.correctOptions || [],
+      correctAnswer: q.correctAnswer || '',
       difficulty: q.difficulty || 'medium',
-      marks: q.marks,
-      subject: q.subject,
+      subject: q.subject || '',
+      language: q.language || '',
+      starterCode: q.starterCode || '',
+      inputExample: q.inputExample || '',
+      outputExample: q.outputExample || '',
+      memoryLimit: q.memoryLimit?.toString() || '256',
+      timeLimit: q.timeLimit?.toString() || '1000',
     });
     setEditingId(q._id);
     setShowForm(true);
@@ -152,6 +241,11 @@ export default function AdminQuestions() {
     if (d === 'easy') return <span className="badge-success">Easy</span>;
     if (d === 'hard') return <span className="badge-danger">Hard</span>;
     return <span className="badge-warning">Medium</span>;
+  };
+
+  const getTypeBadge = (t) => {
+    const labels = { mcq: 'MCQ', multiple_select: 'Multi', true_false: 'T/F', fill_blank: 'Fill', descriptive: 'Desc', coding: 'Code' };
+    return <span className="badge-info">{labels[t] || t}</span>;
   };
 
   return (
@@ -249,31 +343,139 @@ export default function AdminQuestions() {
             )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
+                <label className="label">Question Type *</label>
+                <select name="questionType" value={formData.questionType} onChange={handleTypeChange} className="input-field">
+                  {QUESTION_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
                 <label className="label">Question *</label>
                 <textarea name="questionText" value={formData.questionText} onChange={handleChange} rows={3}
                   className={`input-field ${errors.questionText ? 'border-red-400' : ''}`} />
                 {errors.questionText && <p className="text-red-500 text-xs mt-1">{errors.questionText}</p>}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {['A', 'B', 'C', 'D'].map((label) => (
-                  <div key={label}>
-                    <label className="label">Option {label} *</label>
-                    <input name={`option${label}`} value={formData[`option${label}`]} onChange={handleChange}
-                      className={`input-field ${errors[`option${label}`] ? 'border-red-400' : ''}`} />
-                    {errors[`option${label}`] && <p className="text-red-500 text-xs mt-1">{errors[`option${label}`]}</p>}
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+              {showOptions && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {['A', 'B', 'C', 'D'].map((label) => (
+                    <div key={label}>
+                      <label className="label">
+                        Option {label} *
+                        {formData.questionType === 'true_false' && <span className="text-gray-400 font-normal ml-1">(auto-filled)</span>}
+                      </label>
+                      <input
+                        name={`option${label}`}
+                        value={formData[`option${label}`]}
+                        onChange={handleChange}
+                        disabled={formData.questionType === 'true_false'}
+                        className={`input-field ${errors[`option${label}`] ? 'border-red-400' : ''} ${formData.questionType === 'true_false' ? 'bg-gray-50' : ''}`}
+                      />
+                      {errors[`option${label}`] && <p className="text-red-500 text-xs mt-1">{errors[label]}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {showCorrectOption && (
                 <div>
                   <label className="label">Correct Answer *</label>
                   <select name="correctOption" value={formData.correctOption} onChange={handleChange} className="input-field">
-                    <option value="A">A</option>
-                    <option value="B">B</option>
-                    <option value="C">C</option>
-                    <option value="D">D</option>
+                    {formData.questionType === 'true_false' ? (
+                      <>
+                        <option value="A">True</option>
+                        <option value="B">False</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="C">C</option>
+                        <option value="D">D</option>
+                      </>
+                    )}
                   </select>
                 </div>
+              )}
+
+              {showMultiCorrect && (
+                <div>
+                  <label className="label">Correct Options * (select one or more)</label>
+                  <div className="flex gap-3 mt-1">
+                    {['A', 'B', 'C', 'D'].map((label) => (
+                      <label key={label} className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={(formData.correctOptions || []).includes(label)}
+                          onChange={() => handleMultiSelectOption(label)}
+                          className="w-4 h-4 text-primary-600 rounded"
+                        />
+                        <span className="text-sm text-gray-700">{label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {errors.correctOptions && <p className="text-red-500 text-xs mt-1">{errors.correctOptions}</p>}
+                </div>
+              )}
+
+              {showCorrectAnswer && (
+                <div>
+                  <label className="label">Correct Answer(s) * (comma-separated for multiple)</label>
+                  <input name="correctAnswer" value={formData.correctAnswer} onChange={handleChange}
+                    placeholder="e.g. OOP, Object Oriented Programming"
+                    className={`input-field ${errors.correctAnswer ? 'border-red-400' : ''}`} />
+                  {errors.correctAnswer && <p className="text-red-500 text-xs mt-1">{errors.correctAnswer}</p>}
+                </div>
+              )}
+
+              {showCodingFields && (
+                <div className="space-y-4 border-t border-gray-100 pt-4">
+                  <p className="text-sm font-medium text-gray-700">Coding Question Settings</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Language *</label>
+                      <input name="language" value={formData.language} onChange={handleChange}
+                        placeholder="e.g. JavaScript, Python"
+                        className={`input-field ${errors.language ? 'border-red-400' : ''}`} />
+                      {errors.language && <p className="text-red-500 text-xs mt-1">{errors.language}</p>}
+                    </div>
+                    <div>
+                      <label className="label">Memory Limit (MB)</label>
+                      <input name="memoryLimit" type="number" value={formData.memoryLimit} onChange={handleChange}
+                        className="input-field" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">Time Limit (ms)</label>
+                    <input name="timeLimit" type="number" value={formData.timeLimit} onChange={handleChange}
+                      className="input-field" />
+                  </div>
+                  <div>
+                    <label className="label">Starter Code</label>
+                    <textarea name="starterCode" value={formData.starterCode} onChange={handleChange} rows={4}
+                      placeholder="// Write starter code here..."
+                      className="input-field font-mono text-xs" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Input Example</label>
+                      <textarea name="inputExample" value={formData.inputExample} onChange={handleChange} rows={3}
+                        placeholder="Sample input..."
+                        className="input-field font-mono text-xs" />
+                    </div>
+                    <div>
+                      <label className="label">Output Example</label>
+                      <textarea name="outputExample" value={formData.outputExample} onChange={handleChange} rows={3}
+                        placeholder="Expected output..."
+                        className="input-field font-mono text-xs" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="label">Difficulty</label>
                   <select name="difficulty" value={formData.difficulty} onChange={handleChange} className="input-field">
@@ -289,6 +491,7 @@ export default function AdminQuestions() {
                   {errors.subject && <p className="text-red-500 text-xs mt-1">{errors.subject}</p>}
                 </div>
               </div>
+
               <div className="flex gap-3 justify-end pt-2">
                 <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }} className="btn-secondary">Cancel</button>
                 <button type="submit" className="btn-primary">{editingId ? 'Update' : 'Add'}</button>
@@ -319,9 +522,9 @@ export default function AdminQuestions() {
                 <tr>
                   <th className="table-header-cell">#</th>
                   <th className="table-header-cell">Question</th>
+                  <th className="table-header-cell">Type</th>
                   <th className="table-header-cell">Subject</th>
                   <th className="table-header-cell">Difficulty</th>
-                  <th className="table-header-cell">Correct</th>
                   <th className="table-header-cell">Actions</th>
                 </tr>
               </thead>
@@ -330,9 +533,9 @@ export default function AdminQuestions() {
                   <tr key={q._id} className="hover:bg-gray-50 transition-colors">
                     <td className="table-cell text-gray-500">{index + 1}</td>
                     <td className="table-cell font-medium text-gray-900 max-w-xs truncate">{q.questionText}</td>
+                    <td className="table-cell">{getTypeBadge(q.questionType)}</td>
                     <td className="table-cell text-gray-600">{q.subject}</td>
                     <td className="table-cell">{getDifficultyBadge(q.difficulty)}</td>
-                    <td className="table-cell font-mono font-semibold text-gray-900">{q.correctOption}</td>
                     <td className="table-cell">
                       <div className="flex gap-1">
                         <button onClick={() => handleEdit(q)} className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="Edit">

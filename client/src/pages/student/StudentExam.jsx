@@ -3,8 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import useExamSecurity from '../../hooks/useExamSecurity';
 import {
-  Camera,
-  CameraOff,
   AlertTriangle,
   BookOpen,
   ChevronLeft,
@@ -46,11 +44,8 @@ export default function StudentExam() {
   }, [navigate]);
 
   const {
-    cameraActive,
     isFullscreen,
     enterFullscreen,
-    startCamera,
-    stopCamera,
   } = useExamSecurity(attemptId, handleTerminate);
 
   const fetchExamData = useCallback(async () => {
@@ -68,19 +63,15 @@ export default function StudentExam() {
       setAnswers(data.data.answers || {});
       setTimeRemaining(data.data.timeRemaining);
       setLoading(false);
-      startCamera();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load exam');
       setLoading(false);
     }
-  }, [attemptId, startCamera]);
+  }, [attemptId]);
 
   useEffect(() => {
     fetchExamData();
-    return () => {
-      stopCamera();
-    };
-  }, [fetchExamData, stopCamera]);
+  }, [fetchExamData]);
 
   useEffect(() => {
     if (timeRemaining <= 0 && examData && !submitting && !terminated) {
@@ -252,16 +243,6 @@ export default function StudentExam() {
               <p className="text-xs text-gray-500">Q{currentQ + 1} of {questions.length}</p>
             </div>
             <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-              {/* Camera indicator */}
-              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-50 border border-gray-200">
-                {cameraActive ? (
-                  <Camera className="w-3.5 h-3.5 text-accent-600" />
-                ) : (
-                  <CameraOff className="w-3.5 h-3.5 text-red-500" />
-                )}
-                <span className="text-xs font-medium text-gray-600">{cameraActive ? 'On' : 'Off'}</span>
-              </div>
-
               {/* Progress */}
               <span className="hidden sm:inline text-xs text-gray-500 font-medium">{answeredCount}/{questions.length}</span>
 

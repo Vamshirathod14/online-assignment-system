@@ -11,6 +11,7 @@ router.put('/publish/:testId', protect, authorize('admin'), resultController.pub
 router.put('/unpublish/:testId', protect, authorize('admin'), resultController.unpublishResults);
 router.put('/publish-all', protect, authorize('admin'), resultController.publishAllResults);
 router.put('/unpublish-all', protect, authorize('admin'), resultController.unpublishAllResults);
+router.get('/export-csv', protect, authorize('admin'), resultController.exportResultsCSV);
 router.get('/', protect, authorize('admin'), resultController.getAllResults);
 router.get('/:id', protect, resultController.getResultById);
 

@@ -8,7 +8,7 @@ const questionSchema = new mongoose.Schema(
     },
     questionType: {
       type: String,
-      enum: ['mcq'],
+      enum: ['mcq', 'multiple_select', 'true_false', 'fill_blank', 'descriptive', 'coding'],
       default: 'mcq',
     },
     options: [
@@ -19,7 +19,6 @@ const questionSchema = new mongoose.Schema(
     ],
     correctOption: {
       type: String,
-      required: [true, 'Correct option is required'],
     },
     difficulty: {
       type: String,
@@ -40,6 +39,19 @@ const questionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Admin',
     },
+    starterCode: { type: String, default: '' },
+    language: { type: String, default: '' },
+    inputExample: { type: String, default: '' },
+    outputExample: { type: String, default: '' },
+    hiddenTestCases: [
+      {
+        input: { type: String },
+        expectedOutput: { type: String },
+      },
+    ],
+    memoryLimit: { type: Number, default: 256 },
+    timeLimit: { type: Number, default: 5 },
+    correctAnswers: [{ type: String }],
   },
   { timestamps: true }
 );

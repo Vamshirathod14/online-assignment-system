@@ -7,4 +7,6 @@ module.exports = {
   Result: require('./Result'),
   CameraSnapshot: require('./CameraSnapshot'),
   SecurityLog: require('./SecurityLog'),
+  College: require('./College'),
+  OtpVerification: require('./OtpVerification'),
 };

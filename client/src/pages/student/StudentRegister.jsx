@@ -2,9 +2,12 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { GraduationCap, ArrowLeft, Mail, Lock, Eye, EyeOff, User, Building2, BookOpen, CreditCard, Phone } from 'lucide-react';
+import { DEPARTMENTS } from '../../constants/departments';
+import { titleCase } from '../../utils/textUtils';
 
 const initialFormData = {
   name: '',
+  fatherName: '',
   collegeName: '',
   branch: '',
   hallTicket: '',
@@ -24,9 +27,12 @@ export default function StudentRegister() {
   const navigate = useNavigate();
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    if (errors[e.target.name]) {
-      setErrors({ ...errors, [e.target.name]: '' });
+    const { name, value } = e.target;
+    const autoCapitalizeFields = ['name', 'fatherName', 'collegeName'];
+    const newValue = autoCapitalizeFields.includes(name) ? titleCase(value) : value;
+    setFormData({ ...formData, [name]: newValue });
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: '' });
     }
   };
 
@@ -76,8 +82,9 @@ export default function StudentRegister() {
 
   const fields = [
     { name: 'name', label: 'Full Name', type: 'text', placeholder: 'Enter your full name', icon: User, colSpan: 2 },
+    { name: 'fatherName', label: 'Father Name', type: 'text', placeholder: "Enter father's name", icon: User, colSpan: 2 },
     { name: 'collegeName', label: 'College Name', type: 'text', placeholder: 'Enter your college name', icon: Building2, colSpan: 2 },
-    { name: 'branch', label: 'Branch', type: 'text', placeholder: 'e.g. Computer Science', icon: BookOpen, colSpan: 1 },
+    { name: 'branch', label: 'Branch', type: 'select', placeholder: 'Select department', icon: BookOpen, colSpan: 1, options: DEPARTMENTS },
     { name: 'hallTicket', label: 'Hall Ticket / Roll Number', type: 'text', placeholder: 'Enter your hall ticket', icon: CreditCard, colSpan: 1 },
     { name: 'email', label: 'Email', type: 'email', placeholder: 'you@example.com', icon: Mail, colSpan: 2 },
     { name: 'mobileNumber', label: 'Mobile Number', type: 'tel', placeholder: '10-digit mobile number', icon: Phone, colSpan: 2, maxLength: 10 },
@@ -110,15 +117,29 @@ export default function StudentRegister() {
                     <label className="label">{field.label} *</label>
                     <div className="relative">
                       <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type={field.type}
-                        name={field.name}
-                        value={formData[field.name]}
-                        onChange={handleChange}
-                        placeholder={field.placeholder}
-                        maxLength={field.maxLength}
-                        className={`input-field pl-10 ${errors[field.name] ? 'border-red-400 focus:ring-red-500' : ''}`}
-                      />
+                      {field.type === 'select' ? (
+                        <select
+                          name={field.name}
+                          value={formData[field.name]}
+                          onChange={handleChange}
+                          className={`input-field pl-10 ${errors[field.name] ? 'border-red-400 focus:ring-red-500' : ''}`}
+                        >
+                          <option value="">{field.placeholder}</option>
+                          {field.options.map((opt) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type={field.type}
+                          name={field.name}
+                          value={formData[field.name]}
+                          onChange={handleChange}
+                          placeholder={field.placeholder}
+                          maxLength={field.maxLength}
+                          className={`input-field pl-10 ${errors[field.name] ? 'border-red-400 focus:ring-red-500' : ''}`}
+                        />
+                      )}
                     </div>
                     {errors[field.name] && <p className="text-red-500 text-xs mt-1">{errors[field.name]}</p>}
                   </div>

@@ -11,6 +11,7 @@ import {
   Menu,
   X,
   Shield,
+  Building2,
 } from 'lucide-react';
 
 const navItems = [
@@ -19,6 +20,7 @@ const navItems = [
   { to: '/admin/tests', label: 'Tests', icon: ClipboardList },
   { to: '/admin/questions', label: 'Questions', icon: HelpCircle },
   { to: '/admin/results', label: 'Results', icon: BarChart3 },
+  { to: '/admin/colleges', label: 'Colleges', icon: Building2 },
 ];
 
 export default function AdminLayout({ children }) {
@@ -42,7 +44,7 @@ export default function AdminLayout({ children }) {
             <div className="flex items-center gap-8">
               <Link to="/admin/dashboard" className="flex items-center gap-2 text-xl font-bold text-primary-600">
                 <Shield className="w-6 h-6" />
-                <span>OAS Admin</span>
+                <span>CoreSoft Admin</span>
               </Link>
               <div className="hidden md:flex items-center gap-1">
                 {navItems.map((item) => {
@@ -134,6 +136,9 @@ export default function AdminLayout({ children }) {
         )}
       </nav>
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</main>
+      <footer className="border-t border-gray-100 bg-white py-4 text-center text-xs text-gray-400">
+        Designed &amp; Developed by <span className="font-semibold text-gray-500">V Soft</span> &middot; Crafting Code. Powering Ideas.
+      </footer>
     </div>
   );
 }

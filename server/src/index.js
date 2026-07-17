@@ -29,6 +29,8 @@ app.use('/api/exam', require('./routes/examRoutes'));
 app.use('/api/security', require('./routes/securityRoutes'));
 app.use('/api/results', require('./routes/resultRoutes'));
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
+app.use('/api/colleges', require('./routes/collegeRoutes'));
+app.use('/api/auth', require('./routes/passwordResetRoutes'));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

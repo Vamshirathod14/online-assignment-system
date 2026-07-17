@@ -17,6 +17,9 @@ const AdminStudents = lazy(() => import('./pages/admin/AdminStudents'));
 const AdminTests = lazy(() => import('./pages/admin/AdminTests'));
 const AdminQuestions = lazy(() => import('./pages/admin/AdminQuestions'));
 const AdminResults = lazy(() => import('./pages/admin/AdminResults'));
+const AdminColleges = lazy(() => import('./pages/admin/AdminColleges'));
+const StudentForgotPassword = lazy(() => import('./pages/student/ForgotPassword'));
+const AdminForgotPassword = lazy(() => import('./pages/admin/ForgotPassword'));
 
 function PageLoader() {
   return (
@@ -43,6 +46,7 @@ function App() {
 
         <Route path="/student/login" element={<StudentLogin />} />
         <Route path="/student/register" element={<StudentRegister />} />
+        <Route path="/student/forgot-password" element={<StudentForgotPassword />} />
         <Route
           path="/student/dashboard"
           element={
@@ -73,6 +77,7 @@ function App() {
         />
 
         <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin/forgot-password" element={<AdminForgotPassword />} />
         <Route
           path="/admin/dashboard"
           element={
@@ -119,6 +124,16 @@ function App() {
             <ProtectedRoute allowedRole="admin">
               <AdminLayout>
                 <AdminResults />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/colleges"
+          element={
+            <ProtectedRoute allowedRole="admin">
+              <AdminLayout>
+                <AdminColleges />
               </AdminLayout>
             </ProtectedRoute>
           }

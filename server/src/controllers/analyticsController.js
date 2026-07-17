@@ -9,3 +9,12 @@ exports.getDashboardStats = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.getChartsData = async (req, res, next) => {
+  try {
+    const data = await analyticsService.getChartsData();
+    sendResponse(res, 200, data);
+  } catch (error) {
+    next(error);
+  }
+};

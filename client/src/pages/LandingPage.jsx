@@ -26,7 +26,7 @@ export default function LandingPage() {
         <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-100 rounded-2xl mb-6">
           <GraduationCap className="w-8 h-8 text-primary-600" />
         </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Online Assignment System</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">CoreSoft</h1>
         <p className="text-gray-500 mb-8 text-sm">Examination & Assessment Platform</p>
 
         <div className="space-y-3">
@@ -53,6 +53,12 @@ export default function LandingPage() {
           <Link to="/student/register" className="text-primary-600 font-medium hover:text-primary-700 transition-colors">
             Register here
           </Link>
+        </p>
+      </div>
+
+      <div className="absolute bottom-6 left-0 right-0 text-center">
+        <p className="text-xs text-white/70">
+          Designed &amp; Developed by <span className="font-semibold text-white/90">V Soft</span> &middot; Crafting Code. Powering Ideas.
         </p>
       </div>
     </div>

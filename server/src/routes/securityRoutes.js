@@ -8,5 +8,6 @@ router.post('/terminate/:attemptId', protect, authorize('student'), securityCont
 router.get('/logs/attempt/:attemptId', protect, authorize('admin'), securityController.getLogsByAttempt);
 router.get('/logs/student/:studentId', protect, authorize('admin'), securityController.getLogsByStudent);
 router.get('/summary/:attemptId', protect, authorize('admin'), securityController.getViolationSummary);
+router.post('/reset-exam/:attemptId', protect, authorize('admin'), securityController.resetExam);
 
 module.exports = router;

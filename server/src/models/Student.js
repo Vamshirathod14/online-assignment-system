@@ -7,6 +7,11 @@ const studentSchema = new mongoose.Schema(
       required: [true, 'Name is required'],
       trim: true,
     },
+    fatherName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     collegeName: {
       type: String,
       required: [true, 'College name is required'],

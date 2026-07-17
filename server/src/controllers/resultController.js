@@ -93,3 +93,15 @@ exports.getExamHistory = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.exportResultsCSV = async (req, res, next) => {
+  try {
+    const csvString = await resultService.exportCSV(req.query);
+
+    res.setHeader('Content-Disposition', 'attachment; filename=results.csv');
+    res.setHeader('Content-Type', 'text/csv');
+    res.send(csvString);
+  } catch (error) {
+    next(error);
+  }
+};

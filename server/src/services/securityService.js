@@ -95,6 +95,30 @@ const securityService = {
     }
     return { total: logs.length, summary };
   },
+
+  async resetExam(examAttemptId, adminId, reason = '') {
+    const attempt = await ExamAttempt.findById(examAttemptId);
+    if (!attempt) throw ApiError.notFound('Exam attempt not found');
+    if (attempt.status !== 'terminated') throw ApiError.badRequest('Only terminated exams can be reset');
+
+    await Result.deleteOne({ examAttemptId: attempt._id });
+
+    attempt.status = 'in_progress';
+    attempt.terminatedReason = null;
+    attempt.endTime = null;
+    attempt.answers = [];
+    attempt.startTime = new Date();
+    await attempt.save();
+
+    await SecurityLog.create({
+      studentId: attempt.studentId,
+      examAttemptId: attempt._id,
+      violationType: 'exam_reset',
+      details: `Exam reset by admin. Reason: ${reason || 'No reason provided'}`,
+    });
+
+    return attempt;
+  },
 };
 
 module.exports = securityService;

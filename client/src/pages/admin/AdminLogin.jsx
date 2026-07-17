@@ -60,7 +60,12 @@ export default function AdminLogin() {
               </div>
             </div>
             <div>
-              <label className="label">Password</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="label mb-0">Password</label>
+                <Link to="/admin/forgot-password" className="text-xs text-primary-600 font-medium hover:text-primary-700 transition-colors">
+                  Forgot Password?
+                </Link>
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input

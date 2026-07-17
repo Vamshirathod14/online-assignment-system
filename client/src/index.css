@@ -15,7 +15,7 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 font-sans;
+    @apply bg-[#FFFFFF] text-[#222222] font-sans;
   }
 
   /* Custom scrollbar */
@@ -179,7 +179,7 @@
   }
 
   .gradient-text {
-    @apply bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-primary-500 to-primary-700 bg-clip-text text-transparent;
   }
 
   .glass {

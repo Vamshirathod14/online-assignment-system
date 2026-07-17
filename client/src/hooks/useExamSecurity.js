@@ -2,10 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import api from '../services/api';
 
 export default function useExamSecurity(attemptId, onTerminate) {
-  const [cameraActive, setCameraActive] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const streamRef = useRef(null);
-  const snapshotTimerRef = useRef(null);
   const securityTriggered = useRef(false);
   const onTerminateRef = useRef(onTerminate);
   onTerminateRef.current = onTerminate;
@@ -13,15 +10,6 @@ export default function useExamSecurity(attemptId, onTerminate) {
   const triggerTermination = useCallback(async (violationType, details) => {
     if (securityTriggered.current) return;
     securityTriggered.current = true;
-
-    if (snapshotTimerRef.current) {
-      clearInterval(snapshotTimerRef.current);
-      snapshotTimerRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
 
     try {
       await api.post(`/security/terminate/${attemptId}`, {
@@ -88,12 +76,42 @@ export default function useExamSecurity(attemptId, onTerminate) {
       triggerTermination('popstate', 'Back button navigation detected');
     };
 
+    const handleCopy = (e) => {
+      e.preventDefault();
+      console.log('[Security] Copy attempt blocked');
+    };
+
+    const handlePaste = (e) => {
+      e.preventDefault();
+      console.log('[Security] Paste attempt blocked');
+    };
+
+    const handleContextMenu = (e) => {
+      e.preventDefault();
+      console.log('[Security] Right-click blocked');
+    };
+
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+        e.preventDefault();
+        console.log('[Security] Refresh blocked');
+      }
+      if (e.key === 'F5') {
+        e.preventDefault();
+        console.log('[Security] F5 refresh blocked');
+      }
+    };
+
     window.history.pushState(null, '', window.location.href);
     window.addEventListener('popstate', handlePopState);
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('copy', handleCopy);
+    document.addEventListener('paste', handlePaste);
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('keydown', handleKeyDown);
     window.addEventListener('blur', handleWindowBlur);
     window.addEventListener('pagehide', handlePageHide);
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -102,6 +120,10 @@ export default function useExamSecurity(attemptId, onTerminate) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('copy', handleCopy);
+      document.removeEventListener('paste', handlePaste);
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('blur', handleWindowBlur);
       window.removeEventListener('pagehide', handlePageHide);
       window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -109,68 +131,8 @@ export default function useExamSecurity(attemptId, onTerminate) {
     };
   }, [attemptId, triggerTermination]);
 
-  const startCamera = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 320, height: 240, facingMode: 'user' },
-        audio: false,
-      });
-      streamRef.current = stream;
-      setCameraActive(true);
-
-      const video = document.createElement('video');
-      video.srcObject = stream;
-      video.autoplay = true;
-      video.playsInline = true;
-
-      await new Promise((resolve) => {
-        video.onloadedmetadata = resolve;
-      });
-
-      snapshotTimerRef.current = setInterval(async () => {
-        if (securityTriggered.current) return;
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = 320;
-          canvas.height = 240;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(video, 0, 0, 320, 240);
-          const imageData = canvas.toDataURL('image/jpeg', 0.7);
-
-          await api.post('/exam/snapshot', {
-            examAttemptId: attemptId,
-            imageUrl: imageData,
-          });
-        } catch {
-          // silent
-        }
-      }, 10000);
-
-      stream.getVideoTracks()[0].onended = () => {
-        setCameraActive(false);
-      };
-    } catch {
-      setCameraActive(false);
-    }
-  }, [attemptId]);
-
-  const stopCamera = useCallback(() => {
-    if (snapshotTimerRef.current) {
-      clearInterval(snapshotTimerRef.current);
-      snapshotTimerRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    setCameraActive(false);
-  }, []);
-
   return {
-    cameraActive,
     isFullscreen,
     enterFullscreen,
-    startCamera,
-    stopCamera,
   };
 }

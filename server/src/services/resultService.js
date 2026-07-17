@@ -80,10 +80,21 @@ const resultService = {
         const violationCount = await SecurityLog.countDocuments({
           examAttemptId: result.examAttemptId,
         });
+
+        let timeTaken = null;
+        if (attempt) {
+          const start = attempt.startTime ? new Date(attempt.startTime).getTime() : null;
+          const end = attempt.endTime ? new Date(attempt.endTime).getTime() : Date.now();
+          if (start) {
+            timeTaken = Math.round((end - start) / 1000);
+          }
+        }
+
         return {
           ...result.toObject(),
           attempt: attempt || null,
           violationCount,
+          timeTaken,
         };
       })
     );
@@ -201,6 +212,80 @@ const resultService = {
     return history;
   },
 
+  async exportCSV({ search, testId, isPassed, isPublished }) {
+    const query = {};
+
+    if (isPublished !== undefined) {
+      query.isPublished = isPublished === 'true';
+    }
+
+    if (isPassed !== undefined) {
+      query.isPassed = isPassed === 'true';
+    }
+
+    if (testId) {
+      query.testId = testId;
+    }
+
+    let results = await Result.find(query)
+      .populate({
+        path: 'studentId',
+        select: 'name email hallTicket collegeName branch',
+      })
+      .populate('testId', 'title totalMarks passingMarks branch')
+      .select('-__v');
+
+    if (search) {
+      const regex = new RegExp(search, 'i');
+      results = results.filter(
+        (r) =>
+          (r.studentId?.name && regex.test(r.studentId.name)) ||
+          (r.studentId?.hallTicket && regex.test(r.studentId.hallTicket)) ||
+          (r.testId?.title && regex.test(r.testId.title))
+      );
+    }
+
+    const exportData = [];
+    for (const result of results) {
+      const attempt = await ExamAttempt.findById(result.examAttemptId).select(
+        'status terminatedReason startTime endTime'
+      );
+      const violationCount = await SecurityLog.countDocuments({
+        examAttemptId: result.examAttemptId,
+      });
+
+      let timeTaken = null;
+      if (attempt) {
+        const start = attempt.startTime ? new Date(attempt.startTime).getTime() : null;
+        const end = attempt.endTime ? new Date(attempt.endTime).getTime() : Date.now();
+        if (start) {
+          timeTaken = Math.round((end - start) / 1000);
+        }
+      }
+
+      exportData.push({
+        'Student Name': result.studentId?.name || '',
+        'Hall Ticket': result.studentId?.hallTicket || '',
+        College: result.studentId?.collegeName || '',
+        Branch: result.studentId?.branch || '',
+        Test: result.testId?.title || '',
+        Score: `${result.obtainedMarks}/${result.totalMarks}`,
+        Percentage: `${result.percentage}%`,
+        Result: result.isPassed ? 'Pass' : 'Fail',
+        'Attempt Status': (attempt?.status || '').replace(/_/g, ' '),
+        'Violation Count': violationCount,
+        'Time Taken (s)': timeTaken !== null ? timeTaken : '',
+        Published: result.isPublished ? 'Yes' : 'No',
+      });
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Results');
+
+    const csvString = XLSX.write(workbook, { type: 'string', bookType: 'csv' });
+    return csvString;
+  },
 };
 
 module.exports = resultService;

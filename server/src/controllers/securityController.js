@@ -57,3 +57,12 @@ exports.getViolationSummary = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.resetExam = async (req, res, next) => {
+  try {
+    const result = await securityService.resetExam(req.params.attemptId, req.user._id, req.body.reason || '');
+    sendResponse(res, 200, result, 'Exam reset successfully');
+  } catch (error) {
+    next(error);
+  }
+};
