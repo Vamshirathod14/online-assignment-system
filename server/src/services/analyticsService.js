@@ -196,9 +196,22 @@ const analyticsService = {
       ]),
     ]);
 
+    const passObj = { passed: 0, failed: 0 };
+    for (const item of passVsFail) {
+      if (item._id === true || item._id === 'true') passObj.passed = item.count;
+      else passObj.failed = item.count;
+    }
+
+    const departments = departmentWisePerformance.map(d => ({
+      department: d._id || 'Unknown',
+      avgMarks: Math.round((d.avgPercentage || 0) * 100) / 100,
+      count: d.count,
+    }));
+
     return {
-      departmentWisePerformance,
-      passVsFail,
+      avgMarks: departments,
+      passFail: passObj,
+      departments,
       completedVsTerminated,
       questionWiseAccuracy,
       collegeWiseParticipation,

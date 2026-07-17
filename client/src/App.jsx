@@ -1,6 +1,8 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import ProtectedRoute from './components/shared/ProtectedRoute';
 import StudentLayout from './components/layouts/StudentLayout';
 import AdminLayout from './components/layouts/AdminLayout';
@@ -27,6 +29,18 @@ function PageLoader() {
       <div className="flex flex-col items-center gap-3">
         <div className="w-10 h-10 border-[3px] border-primary-200 border-t-primary-600 rounded-full animate-spin" />
         <p className="text-sm text-gray-500 font-medium">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+function NotFound() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <h1 className="text-6xl font-bold text-gray-300">404</h1>
+        <p className="text-gray-500 mt-2 mb-6">Page not found</p>
+        <a href="/" className="btn-primary">Go Home</a>
       </div>
     </div>
   );
@@ -138,7 +152,9 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="*" element={<NotFound />} />
       </Routes>
+      <ToastContainer position="top-right" autoClose={3000} theme="dark" />
     </Suspense>
   );
 }

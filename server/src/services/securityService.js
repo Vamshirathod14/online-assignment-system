@@ -99,7 +99,9 @@ const securityService = {
   async resetExam(examAttemptId, adminId, reason = '') {
     const attempt = await ExamAttempt.findById(examAttemptId);
     if (!attempt) throw ApiError.notFound('Exam attempt not found');
-    if (attempt.status !== 'terminated') throw ApiError.badRequest('Only terminated exams can be reset');
+    if (attempt.status === 'in_progress') throw ApiError.badRequest('Exam is still in progress — cannot reset');
+
+    const previousStatus = attempt.status;
 
     await Result.deleteOne({ examAttemptId: attempt._id });
 
@@ -114,7 +116,7 @@ const securityService = {
       studentId: attempt.studentId,
       examAttemptId: attempt._id,
       violationType: 'exam_reset',
-      details: `Exam reset by admin. Reason: ${reason || 'No reason provided'}`,
+      details: `Exam reset by admin. Previous status: ${previousStatus}. Reason: ${reason || 'No reason provided'}`,
     });
 
     return attempt;

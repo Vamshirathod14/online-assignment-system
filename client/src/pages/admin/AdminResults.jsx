@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'react-toastify';
 import api from '../../services/api';
 import { Search, Download, Eye, EyeOff, CheckCircle2, X, AlertTriangle, RefreshCw } from 'lucide-react';
 
@@ -74,7 +75,7 @@ export default function AdminResults() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch {
-      alert('Failed to export results');
+      toast.error('Failed to export results');
     }
   };
 
@@ -85,7 +86,7 @@ export default function AdminResults() {
       setSuccessMessage('Exam reset successfully');
       fetchResults();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to reset exam');
+      toast.error(err.response?.data?.message || 'Failed to reset exam');
     }
   };
 
@@ -95,7 +96,7 @@ export default function AdminResults() {
       setSuccessMessage('Results published successfully');
       fetchResults();
     } catch {
-      alert('Failed to publish results');
+      toast.error('Failed to publish results');
     }
   };
 
@@ -106,7 +107,7 @@ export default function AdminResults() {
       setSuccessMessage('Results unpublished successfully');
       fetchResults();
     } catch {
-      alert('Failed to unpublish results');
+      toast.error('Failed to unpublish results');
     }
   };
 
@@ -260,7 +261,7 @@ export default function AdminResults() {
                         <div className="font-semibold text-gray-900">{result.percentage}%</div>
                       </td>
                       <td className="table-cell text-gray-600 text-xs">
-                        {result.attempt?.timeTaken ? `${Math.round(result.attempt.timeTaken / 60)}m` : 'N/A'}
+                        {result.timeTaken != null ? `${Math.round(result.timeTaken / 60)}m ${result.timeTaken % 60}s` : 'N/A'}
                       </td>
                       <td className="table-cell">
                         <div className="space-y-1">

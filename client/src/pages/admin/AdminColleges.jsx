@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'react-toastify';
 import api from '../../services/api';
 import { Search, Plus, Pencil, Trash2, Building2, X, ToggleLeft, ToggleRight } from 'lucide-react';
 
@@ -85,7 +86,7 @@ export default function AdminColleges() {
       await api.delete(`/colleges/${id}`);
       setColleges(colleges.filter((c) => c._id !== id));
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete');
+      toast.error(err.response?.data?.message || 'Failed to delete');
     }
   };
 
@@ -94,7 +95,7 @@ export default function AdminColleges() {
       await api.put(`/colleges/${id}/toggle-status`);
       fetchColleges();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to toggle status');
+      toast.error(err.response?.data?.message || 'Failed to toggle status');
     }
   };
 

@@ -43,17 +43,26 @@ const examService = {
   },
 
   async startExam(studentId, testId) {
+    if (!testId) {
+      throw ApiError.badRequest('Test ID is required');
+    }
+
     const test = await Test.findById(testId);
     if (!test) {
       throw ApiError.notFound('Test not found');
     }
     if (test.status !== 'active') {
-      throw ApiError.badRequest('This test is not active');
+      throw ApiError.badRequest(`This test is currently ${test.status}. Only active tests can be started.`);
     }
 
     const now = new Date();
-    if (now < new Date(test.startDate) || now > new Date(test.endDate)) {
-      throw ApiError.badRequest('This test is not within the allowed time window');
+    const startDate = new Date(test.startDate);
+    const endDate = new Date(test.endDate);
+    if (now < startDate) {
+      throw ApiError.badRequest(`This test has not started yet. It begins on ${startDate.toLocaleString()}.`);
+    }
+    if (now > endDate) {
+      throw ApiError.badRequest(`This test has ended. It was available until ${endDate.toLocaleString()}.`);
     }
 
     const existing = await ExamAttempt.findOne({ studentId, testId, status: 'in_progress' });
@@ -67,12 +76,12 @@ const examService = {
       status: { $in: ['completed', 'timed_out', 'terminated'] },
     });
     if (completed) {
-      throw ApiError.badRequest('You have already completed this test');
+      throw ApiError.badRequest('You have already completed this test. Your admin can reset it if you need to retake it.');
     }
 
     const questionIds = test.assignedQuestions || [];
     if (questionIds.length === 0) {
-      throw ApiError.badRequest('No questions assigned to this test');
+      throw ApiError.badRequest('No questions have been assigned to this test yet. Please contact your administrator.');
     }
 
     const shuffledQuestions = shuffleArray(questionIds);

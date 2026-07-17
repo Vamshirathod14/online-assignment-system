@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import api from '../../services/api';
 import useExamSecurity from '../../hooks/useExamSecurity';
 import {
@@ -73,23 +74,8 @@ export default function StudentExam() {
     fetchExamData();
   }, [fetchExamData]);
 
-  useEffect(() => {
-    if (timeRemaining <= 0 && examData && !submitting && !terminated) {
-      handleAutoSubmit();
-    }
-    timerRef.current = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timerRef.current);
-  }, [examData?.attempt?._id, terminated]);
-
-  const handleAutoSubmit = async () => {
+  const handleAutoSubmitRef = useRef(null);
+  handleAutoSubmitRef.current = async () => {
     if (submitting || terminated) return;
     setSubmitting(true);
     clearInterval(timerRef.current);
@@ -100,6 +86,22 @@ export default function StudentExam() {
       navigate('/student/dashboard');
     }
   };
+
+  useEffect(() => {
+    if (!examData || terminated) return;
+
+    timerRef.current = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          handleAutoSubmitRef.current();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timerRef.current);
+  }, [examData?.attempt?._id, terminated]);
 
   const handleSaveAnswer = async (questionId, selectedOption) => {
     if (terminated) return;
@@ -119,7 +121,7 @@ export default function StudentExam() {
       await api.put(`/exam/submit/${attemptId}`);
       navigate('/student/dashboard', { state: { message: 'Exam submitted successfully' } });
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to submit');
+      toast.error(err.response?.data?.message || 'Failed to submit');
       setSubmitting(false);
     }
   };
@@ -130,7 +132,7 @@ export default function StudentExam() {
     clearInterval(timerRef.current);
     try {
       await api.post(`/security/terminate/${attemptId}`, {
-        reason: 'student_voluntary',
+        reason: 'Student voluntarily ended the exam',
         violationType: 'student_voluntary',
         violationDetails: 'Student chose to end exam',
       });

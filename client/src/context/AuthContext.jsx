@@ -22,8 +22,14 @@ export const AuthProvider = ({ children }) => {
     const savedRole = localStorage.getItem('role');
 
     if (token && savedUser && savedRole) {
-      setUser(JSON.parse(savedUser));
-      setRole(savedRole);
+      try {
+        setUser(JSON.parse(savedUser));
+        setRole(savedRole);
+      } catch {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('role');
+      }
     }
     setLoading(false);
   }, []);

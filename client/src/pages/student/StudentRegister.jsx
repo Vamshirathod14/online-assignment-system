@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../services/api';
 import { GraduationCap, ArrowLeft, Mail, Lock, Eye, EyeOff, User, Building2, BookOpen, CreditCard, Phone } from 'lucide-react';
 import { DEPARTMENTS } from '../../constants/departments';
 import { titleCase } from '../../utils/textUtils';
@@ -23,8 +24,13 @@ export default function StudentRegister() {
   const [apiError, setApiError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [colleges, setColleges] = useState([]);
   const { register } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    api.get('/colleges/active').then(({ data }) => setColleges(data.data || [])).catch(() => {});
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -83,7 +89,7 @@ export default function StudentRegister() {
   const fields = [
     { name: 'name', label: 'Full Name', type: 'text', placeholder: 'Enter your full name', icon: User, colSpan: 2 },
     { name: 'fatherName', label: 'Father Name', type: 'text', placeholder: "Enter father's name", icon: User, colSpan: 2 },
-    { name: 'collegeName', label: 'College Name', type: 'text', placeholder: 'Enter your college name', icon: Building2, colSpan: 2 },
+    { name: 'collegeName', label: 'College Name', type: 'select', placeholder: 'Select your college', icon: Building2, colSpan: 2, options: colleges.filter(c => c.isActive !== false).map(c => c.name) },
     { name: 'branch', label: 'Branch', type: 'select', placeholder: 'Select department', icon: BookOpen, colSpan: 1, options: DEPARTMENTS },
     { name: 'hallTicket', label: 'Hall Ticket / Roll Number', type: 'text', placeholder: 'Enter your hall ticket', icon: CreditCard, colSpan: 1 },
     { name: 'email', label: 'Email', type: 'email', placeholder: 'you@example.com', icon: Mail, colSpan: 2 },

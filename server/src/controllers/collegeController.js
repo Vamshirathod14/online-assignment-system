@@ -1,5 +1,15 @@
 const collegeService = require('../services/collegeService');
 const sendResponse = require('../utils/sendResponse');
+const College = require('../models/College');
+
+exports.getActiveColleges = async (req, res, next) => {
+  try {
+    const colleges = await College.find({ isActive: true }).sort({ name: 1 });
+    sendResponse(res, 200, colleges);
+  } catch (error) {
+    next(error);
+  }
+};
 
 exports.createCollege = async (req, res, next) => {
   try {

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'react-toastify';
 import api from '../../services/api';
 import { Search, Plus, Upload, Pencil, Trash2, HelpCircle, X } from 'lucide-react';
 
@@ -211,13 +212,13 @@ export default function AdminQuestions() {
       await api.delete(`/questions/${id}`);
       setQuestions(questions.filter((q) => q._id !== id));
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete');
+      toast.error(err.response?.data?.message || 'Failed to delete');
     }
   };
 
   const handleBulkUpload = async () => {
     if (!uploadFile) {
-      alert('Please select a file');
+      toast.error('Please select a file');
       return;
     }
     setUploading(true);

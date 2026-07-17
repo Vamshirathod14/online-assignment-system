@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'react-toastify';
 import api from '../../services/api';
 import { Search, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, ClipboardList, X } from 'lucide-react';
+import { DEPARTMENTS } from '../../constants/departments';
 
 const initialFormData = {
   title: '',
@@ -83,15 +85,21 @@ export default function AdminTests() {
     setApiError('');
     if (!validate()) return;
     try {
+      let newTestId = editingId;
       if (editingId) {
         await api.put(`/tests/${editingId}`, formData);
       } else {
-        await api.post('/tests', formData);
+        const { data } = await api.post('/tests', formData);
+        newTestId = data.data._id;
       }
       setShowForm(false);
       setEditingId(null);
       setFormData(initialFormData);
-      fetchTests();
+      await fetchTests();
+      if (!editingId && newTestId) {
+        const test = (await api.get(`/tests/${newTestId}`)).data.data;
+        openAssignModal(test);
+      }
     } catch (err) {
       setApiError(err.response?.data?.message || 'Operation failed');
     }
@@ -120,7 +128,7 @@ export default function AdminTests() {
       await api.delete(`/tests/${id}`);
       setTests(tests.filter((t) => t._id !== id));
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete');
+      toast.error(err.response?.data?.message || 'Failed to delete');
     }
   };
 
@@ -129,7 +137,7 @@ export default function AdminTests() {
       const { data } = await api.put(`/tests/${id}/toggle-status`);
       setTests(tests.map((t) => (t._id === id ? data.data : t)));
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to toggle status');
+      toast.error(err.response?.data?.message || 'Failed to toggle status');
     }
   };
 
@@ -147,13 +155,13 @@ export default function AdminTests() {
     try {
       if (assignMode === 'random') {
         if (!assignCount || Number(assignCount) <= 0) {
-          alert('Enter a valid number of questions');
+          toast.error('Enter a valid number of questions');
           return;
         }
         await api.put(`/tests/${assignTestId}/assign-random`, { count: Number(assignCount) || undefined });
       } else {
         if (selectedQuestions.length === 0) {
-          alert('Select at least one question');
+          toast.error('Select at least one question');
           return;
         }
         await api.put(`/tests/${assignTestId}/assign-manual`, { questionIds: selectedQuestions });
@@ -161,7 +169,7 @@ export default function AdminTests() {
       setShowAssignModal(false);
       fetchTests();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to assign questions');
+      toast.error(err.response?.data?.message || 'Failed to assign questions');
     }
   };
 
@@ -223,7 +231,10 @@ export default function AdminTests() {
                 </div>
                 <div>
                   <label className="label">Branch *</label>
-                  <input name="branch" value={formData.branch} onChange={handleChange} className={`input-field ${errors.branch ? 'border-red-400' : ''}`} />
+                  <select name="branch" value={formData.branch} onChange={handleChange} className={`input-field ${errors.branch ? 'border-red-400' : ''}`}>
+                    <option value="">Select Branch</option>
+                    {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
                   {errors.branch && <p className="text-red-500 text-xs mt-1">{errors.branch}</p>}
                 </div>
               </div>
@@ -322,7 +333,16 @@ export default function AdminTests() {
                           onChange={() => toggleQuestionSelection(q._id)} className="mt-1 rounded" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-800 line-clamp-1">{q.questionText}</p>
-                          <p className="text-xs text-gray-500">{q.subject} &middot; {q.difficulty}</p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span className="text-xs text-gray-500">{q.subject}</span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${q.difficulty === 'easy' ? 'bg-green-50 text-green-700' : q.difficulty === 'hard' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>
+                              {q.difficulty}
+                            </span>
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">
+                              {q.questionType === 'mcq' ? 'MCQ' : q.questionType === 'coding' ? 'Code' : q.questionType === 'true_false' ? 'T/F' : q.questionType === 'multiple_select' ? 'Multi' : q.questionType === 'fill_blank' ? 'Fill' : q.questionType === 'descriptive' ? 'Desc' : q.questionType}
+                            </span>
+                            <span className="text-xs text-gray-400">{q.marks} mark{q.marks !== 1 ? 's' : ''}</span>
+                          </div>
                         </div>
                       </label>
                     ))

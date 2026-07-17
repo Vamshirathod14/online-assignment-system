@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import api from '../../services/api';
 import {
   ClipboardCheck,
@@ -209,7 +210,7 @@ export default function StudentDashboard() {
       const { data } = await api.post('/exam/start', { testId });
       navigate(`/student/exam/${data.data._id}`);
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to start exam');
+      toast.error(err.response?.data?.message || 'Failed to start exam');
     } finally {
       setStartingTest(null);
     }
