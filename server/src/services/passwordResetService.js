@@ -56,7 +56,7 @@ async function sendEmail(to, subject, html) {
     console.log(`[Email] Sending OTP to ${to}`);
 
     const info = await t.sendMail({
-      from: `"CoreSoft" <${process.env.EMAIL_USER}>`,
+      from: process.env.EMAIL_FROM || `"SCIENT INSTITUTE OF TECHNOLOGY" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       html,
