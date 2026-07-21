@@ -32,6 +32,26 @@ const testSchema = new mongoose.Schema(
       type: Number,
       required: [true, 'Passing marks is required'],
     },
+    mcqsRequired: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    trueFalseRequired: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    fillBlanksRequired: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    codingRequired: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     startDate: {
       type: Date,
       required: [true, 'Start date is required'],

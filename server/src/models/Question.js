@@ -1,5 +1,11 @@
 const mongoose = require('mongoose');
 
+const testCaseSchema = new mongoose.Schema({
+  input: { type: String, default: '' },
+  expectedOutput: { type: String, default: '' },
+  explanation: { type: String, default: '' },
+}, { _id: true });
+
 const questionSchema = new mongoose.Schema(
   {
     questionText: {
@@ -40,17 +46,13 @@ const questionSchema = new mongoose.Schema(
       ref: 'Admin',
     },
     starterCode: { type: String, default: '' },
-    language: { type: String, default: '' },
-    inputExample: { type: String, default: '' },
-    outputExample: { type: String, default: '' },
-    hiddenTestCases: [
-      {
-        input: { type: String },
-        expectedOutput: { type: String },
-      },
-    ],
+    allowedLanguages: [{ type: String }],
+    constraints: { type: String, default: '' },
+    explanation: { type: String, default: '' },
+    sampleTestCases: [testCaseSchema],
+    hiddenTestCases: [testCaseSchema],
     memoryLimit: { type: Number, default: 256 },
-    timeLimit: { type: Number, default: 5 },
+    timeLimit: { type: Number, default: 5000 },
     correctAnswers: [{ type: String }],
   },
   { timestamps: true }

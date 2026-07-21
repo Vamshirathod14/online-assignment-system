@@ -1,5 +1,17 @@
 const mongoose = require('mongoose');
 
+const codingAnswerSchema = new mongoose.Schema({
+  questionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Question' },
+  sourceCode: { type: String, default: '' },
+  language: { type: String, default: '' },
+  passedTestCases: { type: Number, default: 0 },
+  totalTestCases: { type: Number, default: 0 },
+  compileError: { type: String, default: '' },
+  runtimeError: { type: String, default: '' },
+  executionTime: { type: Number, default: 0 },
+  memoryUsed: { type: Number, default: 0 },
+}, { _id: false });
+
 const examAttemptSchema = new mongoose.Schema(
   {
     studentId: {
@@ -31,6 +43,7 @@ const examAttemptSchema = new mongoose.Schema(
         selectedOption: String,
       },
     ],
+    codingAnswers: [codingAnswerSchema],
     startTime: {
       type: Date,
       default: Date.now,
@@ -40,7 +53,7 @@ const examAttemptSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['in_progress', 'completed', 'timed_out', 'terminated'],
+      enum: ['in_progress', 'completed', 'timed_out', 'terminated', 'reset'],
       default: 'in_progress',
     },
     terminatedReason: {
@@ -50,6 +63,10 @@ const examAttemptSchema = new mongoose.Schema(
     ipAddress: {
       type: String,
       default: '',
+    },
+    seed: {
+      type: Number,
+      default: 0,
     },
   },
   { timestamps: true }

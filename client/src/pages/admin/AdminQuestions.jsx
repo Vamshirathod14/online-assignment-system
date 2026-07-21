@@ -12,6 +12,17 @@ const QUESTION_TYPES = [
   { value: 'coding', label: 'Coding' },
 ];
 
+const CODING_LANGUAGES = [
+  { value: 'python', label: 'Python' },
+  { value: 'java', label: 'Java' },
+  { value: 'c', label: 'C' },
+  { value: 'cpp', label: 'C++' },
+  { value: 'javascript', label: 'JavaScript' },
+];
+
+const newSampleTC = () => ({ input: '', expectedOutput: '', explanation: '' });
+const newHiddenTC = () => ({ input: '', expectedOutput: '' });
+
 const initialQuestion = {
   questionText: '',
   questionType: 'mcq',
@@ -24,12 +35,16 @@ const initialQuestion = {
   correctAnswer: '',
   difficulty: 'medium',
   subject: '',
+  marks: '1',
   language: '',
+  allowedLanguages: [],
   starterCode: '',
-  inputExample: '',
-  outputExample: '',
+  constraints: '',
+  explanation: '',
+  sampleTestCases: [newSampleTC()],
+  hiddenTestCases: [newHiddenTC()],
   memoryLimit: '256',
-  timeLimit: '1000',
+  timeLimit: '5000',
 };
 
 export default function AdminQuestions() {
@@ -103,6 +118,36 @@ export default function AdminQuestions() {
     });
   };
 
+  const handleLanguageToggle = (lang) => {
+    setFormData((prev) => {
+      const current = prev.allowedLanguages || [];
+      const updated = current.includes(lang) ? current.filter(l => l !== lang) : [...current, lang];
+      return { ...prev, allowedLanguages: updated };
+    });
+  };
+
+  const updateSampleTC = (index, field, value) => {
+    setFormData(prev => {
+      const tcs = [...prev.sampleTestCases];
+      tcs[index] = { ...tcs[index], [field]: value };
+      return { ...prev, sampleTestCases: tcs };
+    });
+  };
+
+  const addSampleTC = () => setFormData(prev => ({ ...prev, sampleTestCases: [...prev.sampleTestCases, newSampleTC()] }));
+  const removeSampleTC = (index) => setFormData(prev => ({ ...prev, sampleTestCases: prev.sampleTestCases.filter((_, i) => i !== index) }));
+
+  const updateHiddenTC = (index, field, value) => {
+    setFormData(prev => {
+      const tcs = [...prev.hiddenTestCases];
+      tcs[index] = { ...tcs[index], [field]: value };
+      return { ...prev, hiddenTestCases: tcs };
+    });
+  };
+
+  const addHiddenTC = () => setFormData(prev => ({ ...prev, hiddenTestCases: [...prev.hiddenTestCases, newHiddenTC()] }));
+  const removeHiddenTC = (index) => setFormData(prev => ({ ...prev, hiddenTestCases: prev.hiddenTestCases.filter((_, i) => i !== index) }));
+
   const showOptions = ['mcq', 'multiple_select', 'true_false'].includes(formData.questionType);
   const showCorrectOption = formData.questionType === 'mcq' || formData.questionType === 'true_false';
   const showMultiCorrect = formData.questionType === 'multiple_select';
@@ -113,6 +158,7 @@ export default function AdminQuestions() {
     const newErrors = {};
     if (!formData.questionText.trim()) newErrors.questionText = 'Question text is required';
     if (!formData.subject.trim()) newErrors.subject = 'Subject is required';
+    if (!formData.marks || parseInt(formData.marks) < 1) newErrors.marks = 'Marks must be at least 1';
     if (formData.questionType === 'mcq') {
       if (!formData.optionA.trim()) newErrors.optionA = 'Option A is required';
       if (!formData.optionB.trim()) newErrors.optionB = 'Option B is required';
@@ -127,7 +173,12 @@ export default function AdminQuestions() {
     } else if (formData.questionType === 'fill_blank') {
       if (!formData.correctAnswer.trim()) newErrors.correctAnswer = 'Correct answer is required';
     } else if (formData.questionType === 'coding') {
-      if (!formData.language.trim()) newErrors.language = 'Language is required';
+      if (!formData.allowedLanguages || formData.allowedLanguages.length === 0) newErrors.allowedLanguages = 'Select at least one language';
+      if (!formData.starterCode.trim()) newErrors.starterCode = 'Starter code is required';
+      const validSampleTCs = formData.sampleTestCases.filter(tc => tc.input.trim() || tc.expectedOutput.trim());
+      if (validSampleTCs.length === 0) newErrors.sampleTestCases = 'At least one sample test case is required';
+      const validHiddenTCs = formData.hiddenTestCases.filter(tc => tc.input.trim() || tc.expectedOutput.trim());
+      if (validHiddenTCs.length === 0) newErrors.hiddenTestCases = 'At least one hidden test case is required';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -137,7 +188,13 @@ export default function AdminQuestions() {
     e.preventDefault();
     setApiError('');
     if (!validate()) return;
-    let payload = { questionText: formData.questionText, questionType: formData.questionType, difficulty: formData.difficulty, subject: formData.subject };
+    let payload = {
+      questionText: formData.questionText,
+      questionType: formData.questionType,
+      difficulty: formData.difficulty,
+      subject: formData.subject,
+      marks: parseInt(formData.marks) || 1,
+    };
     if (formData.questionType === 'mcq') {
       payload.options = [{ label: 'A', text: formData.optionA }, { label: 'B', text: formData.optionB }, { label: 'C', text: formData.optionC }, { label: 'D', text: formData.optionD }];
       payload.correctOption = formData.correctOption;
@@ -150,12 +207,14 @@ export default function AdminQuestions() {
     } else if (formData.questionType === 'fill_blank') {
       payload.correctAnswer = formData.correctAnswer;
     } else if (formData.questionType === 'coding') {
-      payload.language = formData.language;
+      payload.allowedLanguages = formData.allowedLanguages;
       payload.starterCode = formData.starterCode;
-      payload.inputExample = formData.inputExample;
-      payload.outputExample = formData.outputExample;
+      payload.constraints = formData.constraints;
+      payload.explanation = formData.explanation;
+      payload.sampleTestCases = formData.sampleTestCases.filter(tc => tc.input.trim() || tc.expectedOutput.trim());
+      payload.hiddenTestCases = formData.hiddenTestCases.filter(tc => tc.input.trim() || tc.expectedOutput.trim());
       payload.memoryLimit = parseInt(formData.memoryLimit) || 256;
-      payload.timeLimit = parseInt(formData.timeLimit) || 1000;
+      payload.timeLimit = parseInt(formData.timeLimit) || 5000;
     }
     try {
       if (editingId) {
@@ -183,9 +242,15 @@ export default function AdminQuestions() {
       optionA: optMap['A'] || '', optionB: optMap['B'] || '', optionC: optMap['C'] || '', optionD: optMap['D'] || '',
       correctOption: q.correctOption || 'A', correctOptions: q.correctOptions || [], correctAnswer: q.correctAnswer || '',
       difficulty: q.difficulty || 'medium', subject: q.subject || '',
-      language: q.language || '', starterCode: q.starterCode || '',
-      inputExample: q.inputExample || '', outputExample: q.outputExample || '',
-      memoryLimit: q.memoryLimit?.toString() || '256', timeLimit: q.timeLimit?.toString() || '1000',
+      marks: q.marks?.toString() || '1',
+      allowedLanguages: q.allowedLanguages || (q.language ? [q.language] : []),
+      language: q.language || '',
+      starterCode: q.starterCode || '',
+      constraints: q.constraints || '',
+      explanation: q.explanation || '',
+      sampleTestCases: (q.sampleTestCases && q.sampleTestCases.length > 0) ? q.sampleTestCases : [newSampleTC()],
+      hiddenTestCases: (q.hiddenTestCases && q.hiddenTestCases.length > 0) ? q.hiddenTestCases : [newHiddenTC()],
+      memoryLimit: q.memoryLimit?.toString() || '256', timeLimit: q.timeLimit?.toString() || '5000',
     });
     setEditingId(q._id);
     setShowForm(true);
@@ -380,7 +445,8 @@ export default function AdminQuestions() {
               <button onClick={() => { setShowUpload(false); setUploadResult(null); }} className="p-1.5 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-500" /></button>
             </div>
             <p className="text-sm text-gray-500 mb-4">
-              Upload Excel (.xlsx) with columns: <strong>Question, OptionA, OptionB, OptionC, OptionD, CorrectAnswer, Subject</strong>
+              Upload Excel (.xlsx). <strong>MCQ columns:</strong> Question, OptionA, OptionB, OptionC, OptionD, CorrectAnswer, Subject, Marks, Difficulty.
+              <br /><strong>Coding columns:</strong> Type=coding, Question, Languages, StarterCode, Constraints, Explanation, SampleInput, SampleOutput, HiddenInput, HiddenOutput, TimeLimit, MemoryLimit, Subject, Marks, Difficulty.
             </p>
             {apiError && <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl mb-4 text-sm font-medium">{apiError}</div>}
             <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center mb-4 hover:border-primary-300 transition-colors">
@@ -415,7 +481,7 @@ export default function AdminQuestions() {
       {/* Create/Edit Question Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 animate-scale-in">
+          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 animate-scale-in">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-xl font-bold text-gray-900">{editingId ? 'Edit Question' : 'Add Question'}</h2>
               <button onClick={() => { setShowForm(false); setEditingId(null); }} className="p-1.5 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-500" /></button>
@@ -433,6 +499,7 @@ export default function AdminQuestions() {
                 <textarea name="questionText" value={formData.questionText} onChange={handleChange} rows={3} className={`input-field ${errors.questionText ? 'border-red-400' : ''}`} />
                 {errors.questionText && <p className="text-red-500 text-xs mt-1">{errors.questionText}</p>}
               </div>
+
               {showOptions && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {['A', 'B', 'C', 'D'].map((label) => (
@@ -473,39 +540,133 @@ export default function AdminQuestions() {
                   {errors.correctAnswer && <p className="text-red-500 text-xs mt-1">{errors.correctAnswer}</p>}
                 </div>
               )}
+
               {showCodingFields && (
                 <div className="space-y-4 border-t border-gray-100 pt-4">
-                  <p className="text-sm font-medium text-gray-700">Coding Question Settings</p>
-                  <div className="grid grid-cols-2 gap-4">
+                  <p className="text-sm font-semibold text-gray-700">Coding Question Settings</p>
+
+                  {/* Marks + Difficulty */}
+                  <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <label className="label">Language *</label>
-                      <input name="language" value={formData.language} onChange={handleChange} placeholder="e.g. JavaScript, Python" className={`input-field ${errors.language ? 'border-red-400' : ''}`} />
+                      <label className="label">Marks *</label>
+                      <input name="marks" type="number" min="1" value={formData.marks} onChange={handleChange} className={`input-field ${errors.marks ? 'border-red-400' : ''}`} />
+                      {errors.marks && <p className="text-red-500 text-xs mt-1">{errors.marks}</p>}
+                    </div>
+                    <div>
+                      <label className="label">Time Limit (ms)</label>
+                      <input name="timeLimit" type="number" value={formData.timeLimit} onChange={handleChange} className="input-field" />
                     </div>
                     <div>
                       <label className="label">Memory Limit (MB)</label>
                       <input name="memoryLimit" type="number" value={formData.memoryLimit} onChange={handleChange} className="input-field" />
                     </div>
                   </div>
+
+                  {/* Allowed Languages */}
                   <div>
-                    <label className="label">Time Limit (ms)</label>
-                    <input name="timeLimit" type="number" value={formData.timeLimit} onChange={handleChange} className="input-field" />
-                  </div>
-                  <div>
-                    <label className="label">Starter Code</label>
-                    <textarea name="starterCode" value={formData.starterCode} onChange={handleChange} rows={4} placeholder="// Write starter code here..." className="input-field font-mono text-xs" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="label">Input Example</label>
-                      <textarea name="inputExample" value={formData.inputExample} onChange={handleChange} rows={3} placeholder="Sample input..." className="input-field font-mono text-xs" />
+                    <label className="label">Allowed Languages *</label>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {CODING_LANGUAGES.map(lang => (
+                        <button key={lang.value} type="button" onClick={() => handleLanguageToggle(lang.value)}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium border-2 transition-colors ${
+                            (formData.allowedLanguages || []).includes(lang.value)
+                              ? 'border-primary-500 bg-primary-50 text-primary-700'
+                              : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                          }`}>
+                          {lang.label}
+                        </button>
+                      ))}
                     </div>
-                    <div>
-                      <label className="label">Output Example</label>
-                      <textarea name="outputExample" value={formData.outputExample} onChange={handleChange} rows={3} placeholder="Expected output..." className="input-field font-mono text-xs" />
+                    {errors.allowedLanguages && <p className="text-red-500 text-xs mt-1">{errors.allowedLanguages}</p>}
+                  </div>
+
+                  {/* Constraints */}
+                  <div>
+                    <label className="label">Constraints</label>
+                    <textarea name="constraints" value={formData.constraints} onChange={handleChange} rows={2} placeholder="e.g. 1 <= n <= 10^5, 0 <= arr[i] <= 10^9" className="input-field font-mono text-xs" />
+                  </div>
+
+                  {/* Starter Code */}
+                  <div>
+                    <label className="label">Starter Code *</label>
+                    <textarea name="starterCode" value={formData.starterCode} onChange={handleChange} rows={6} placeholder="// Write starter code here..." className="input-field font-mono text-xs" />
+                    {errors.starterCode && <p className="text-red-500 text-xs mt-1">{errors.starterCode}</p>}
+                  </div>
+
+                  {/* Explanation */}
+                  <div>
+                    <label className="label">Explanation (shown to student after submission)</label>
+                    <textarea name="explanation" value={formData.explanation} onChange={handleChange} rows={3} placeholder="Explain the approach/solution..." className="input-field text-sm" />
+                  </div>
+
+                  {/* Sample Test Cases */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="label mb-0">Sample Test Cases (visible to student)</label>
+                      <button type="button" onClick={addSampleTC} className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1">
+                        <Plus className="w-3 h-3" /> Add
+                      </button>
+                    </div>
+                    {errors.sampleTestCases && <p className="text-red-500 text-xs mb-2">{errors.sampleTestCases}</p>}
+                    <div className="space-y-3">
+                      {formData.sampleTestCases.map((tc, idx) => (
+                        <div key={idx} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-gray-500">Sample {idx + 1}</span>
+                            {formData.sampleTestCases.length > 1 && (
+                              <button type="button" onClick={() => removeSampleTC(idx)} className="text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs text-gray-500">Input</label>
+                              <textarea value={tc.input} onChange={(e) => updateSampleTC(idx, 'input', e.target.value)} rows={2} className="input-field font-mono text-xs" placeholder="Sample input..." />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-500">Expected Output</label>
+                              <textarea value={tc.expectedOutput} onChange={(e) => updateSampleTC(idx, 'expectedOutput', e.target.value)} rows={2} className="input-field font-mono text-xs" placeholder="Expected output..." />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Hidden Test Cases */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="label mb-0">Hidden Test Cases (used for grading)</label>
+                      <button type="button" onClick={addHiddenTC} className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1">
+                        <Plus className="w-3 h-3" /> Add
+                      </button>
+                    </div>
+                    {errors.hiddenTestCases && <p className="text-red-500 text-xs mb-2">{errors.hiddenTestCases}</p>}
+                    <div className="space-y-3">
+                      {formData.hiddenTestCases.map((tc, idx) => (
+                        <div key={idx} className="border border-amber-200 bg-amber-50/50 rounded-lg p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-amber-700">Hidden {idx + 1}</span>
+                            {formData.hiddenTestCases.length > 1 && (
+                              <button type="button" onClick={() => removeHiddenTC(idx)} className="text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs text-gray-500">Input</label>
+                              <textarea value={tc.input} onChange={(e) => updateHiddenTC(idx, 'input', e.target.value)} rows={2} className="input-field font-mono text-xs" placeholder="Test input..." />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-500">Expected Output</label>
+                              <textarea value={tc.expectedOutput} onChange={(e) => updateHiddenTC(idx, 'expectedOutput', e.target.value)} rows={2} className="input-field font-mono text-xs" placeholder="Expected output..." />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
               )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="label">Difficulty</label>

@@ -12,6 +12,10 @@ const initialFormData = {
   duration: '',
   totalQuestions: '',
   passingMarks: '',
+  mcqsRequired: '',
+  trueFalseRequired: '',
+  fillBlanksRequired: '',
+  codingRequired: '',
   startDate: '',
   endDate: '',
   status: 'inactive',
@@ -115,6 +119,10 @@ export default function AdminTests() {
       duration: test.duration,
       totalQuestions: test.totalQuestions,
       passingMarks: test.passingMarks,
+      mcqsRequired: test.mcqsRequired || '',
+      trueFalseRequired: test.trueFalseRequired || '',
+      fillBlanksRequired: test.fillBlanksRequired || '',
+      codingRequired: test.codingRequired || '',
       startDate: test.startDate ? new Date(test.startDate).toISOString().slice(0, 16) : '',
       endDate: test.endDate ? new Date(test.endDate).toISOString().slice(0, 16) : '',
       status: test.status,
@@ -254,6 +262,24 @@ export default function AdminTests() {
                   <label className="label">Total Questions *</label>
                   <input name="totalQuestions" type="number" value={formData.totalQuestions} onChange={handleChange} className={`input-field ${errors.totalQuestions ? 'border-red-400' : ''}`} />
                   {errors.totalQuestions && <p className="text-red-500 text-xs mt-1">{errors.totalQuestions}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div>
+                  <label className="label">MCQs Required</label>
+                  <input name="mcqsRequired" type="number" min="0" value={formData.mcqsRequired} onChange={handleChange} className="input-field" placeholder="0" />
+                </div>
+                <div>
+                  <label className="label">True/False Required</label>
+                  <input name="trueFalseRequired" type="number" min="0" value={formData.trueFalseRequired} onChange={handleChange} className="input-field" placeholder="0" />
+                </div>
+                <div>
+                  <label className="label">Fill Blanks Required</label>
+                  <input name="fillBlanksRequired" type="number" min="0" value={formData.fillBlanksRequired} onChange={handleChange} className="input-field" placeholder="0" />
+                </div>
+                <div>
+                  <label className="label">Coding Required</label>
+                  <input name="codingRequired" type="number" min="0" value={formData.codingRequired} onChange={handleChange} className="input-field" placeholder="0" />
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

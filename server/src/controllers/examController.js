@@ -42,6 +42,21 @@ exports.autoSaveAnswer = async (req, res, next) => {
   }
 };
 
+exports.saveCodingAnswer = async (req, res, next) => {
+  try {
+    const result = await examService.saveCodingAnswer(
+      req.params.attemptId,
+      req.user._id,
+      req.body.questionId,
+      req.body.sourceCode,
+      req.body.language
+    );
+    sendResponse(res, 200, result, 'Code saved');
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.submitExam = async (req, res, next) => {
   try {
     const result = await examService.submitExam(req.params.attemptId, req.user._id);

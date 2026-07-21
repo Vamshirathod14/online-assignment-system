@@ -25,6 +25,8 @@ const resultSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    mcqScore: { type: Number, default: 0 },
+    codingScore: { type: Number, default: 0 },
     totalCorrectAnswers: {
       type: Number,
       default: 0,

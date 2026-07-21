@@ -7,6 +7,7 @@ router.get('/available-tests', protect, authorize('student'), examController.get
 router.post('/start', protect, authorize('student'), examController.startExam);
 router.get('/data/:attemptId', protect, authorize('student'), examController.getExamData);
 router.put('/save-answer/:attemptId', protect, authorize('student'), examController.autoSaveAnswer);
+router.put('/save-coding/:attemptId', protect, authorize('student'), examController.saveCodingAnswer);
 router.put('/submit/:attemptId', protect, authorize('student'), examController.submitExam);
 router.put('/timeout/:attemptId', protect, authorize('student'), examController.timeOutExam);
 router.get('/my-attempts', protect, authorize('student'), examController.getMyAttempts);

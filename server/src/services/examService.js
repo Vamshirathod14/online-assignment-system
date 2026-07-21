@@ -1,14 +1,6 @@
 const { ExamAttempt, Question, Test, Result, CameraSnapshot } = require('../models');
 const ApiError = require('../utils/ApiError');
-
-function shuffleArray(arr) {
-  const shuffled = [...arr];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
+const { deriveSeed, seededShuffle, mulberry32 } = require('../utils/seededRandom');
 
 const examService = {
   async getAvailableTests(studentId) {
@@ -17,16 +9,20 @@ const examService = {
       .populate('createdBy', 'name')
       .sort({ startDate: 1 });
 
-    const attempts = await ExamAttempt.find({ studentId }).select('testId status');
+    const attempts = await ExamAttempt.find({ studentId }).select('testId status createdAt');
 
-    const attemptMap = {};
+    const latestAttemptMap = {};
     for (const attempt of attempts) {
-      attemptMap[attempt.testId.toString()] = attempt.status;
+      const key = attempt.testId.toString();
+      if (!latestAttemptMap[key] || attempt.createdAt > latestAttemptMap[key].createdAt) {
+        latestAttemptMap[key] = attempt;
+      }
     }
 
     return tests.map((test) => {
       const testObj = test.toObject();
-      const attemptStatus = attemptMap[test._id.toString()] || null;
+      const latestAttempt = latestAttemptMap[test._id.toString()];
+      const attemptStatus = latestAttempt ? latestAttempt.status : null;
 
       let studentStatus = 'not_started';
       if (attemptStatus === 'completed' || attemptStatus === 'timed_out') {
@@ -36,6 +32,7 @@ const examService = {
       } else if (attemptStatus === 'terminated') {
         studentStatus = 'terminated';
       }
+      // 'reset' and null both map to 'not_started' (default)
 
       testObj.studentStatus = studentStatus;
       return testObj;
@@ -70,12 +67,14 @@ const examService = {
       return existing;
     }
 
-    const completed = await ExamAttempt.findOne({
-      studentId,
-      testId,
-      status: { $in: ['completed', 'timed_out', 'terminated'] },
-    });
-    if (completed) {
+    const latest = await ExamAttempt.findOne({ studentId, testId })
+      .sort({ createdAt: -1 });
+
+    if (latest && !['reset', 'terminated', 'completed', 'timed_out'].includes(latest.status)) {
+      return latest;
+    }
+
+    if (latest && latest.status !== 'reset') {
       throw ApiError.badRequest('You have already completed this test. Your admin can reset it if you need to retake it.');
     }
 
@@ -84,21 +83,67 @@ const examService = {
       throw ApiError.badRequest('No questions have been assigned to this test yet. Please contact your administrator.');
     }
 
-    const shuffledQuestions = shuffleArray(questionIds);
+    const seed = deriveSeed(studentId.toString(), testId.toString(), 'exam');
+    const rng = mulberry32(seed);
+
+    const allQuestions = await Question.find({ _id: { $in: questionIds } });
+    const qMap = {};
+    for (const q of allQuestions) qMap[q._id.toString()] = q;
+
+    const byType = { mcq: [], true_false: [], fill_blank: [], multiple_select: [], coding: [], descriptive: [] };
+    for (const qId of questionIds) {
+      const q = qMap[qId.toString()];
+      if (q && byType[q.questionType]) byType[q.questionType].push(qId);
+    }
+
+    const pick = (pool, count) => {
+      if (count <= 0 || pool.length === 0) return [];
+      const shuffled = seededShuffle(pool, rng);
+      return shuffled.slice(0, Math.min(count, shuffled.length));
+    };
+
+    const mcqCount = test.mcqsRequired || 0;
+    const tfCount = test.trueFalseRequired || 0;
+    const fbCount = test.fillBlanksRequired || 0;
+    const codeCount = test.codingRequired || 0;
+    const hasConfig = mcqCount + tfCount + fbCount + codeCount > 0;
+
+    let selectedIds;
+    if (hasConfig) {
+      const selected = [
+        ...pick(byType.mcq, mcqCount),
+        ...pick(byType.true_false, tfCount),
+        ...pick(byType.fill_blank, fbCount),
+        ...pick(byType.multiple_select, 0),
+        ...pick(byType.coding, codeCount),
+      ];
+      selectedIds = seededShuffle(selected, rng);
+    } else {
+      selectedIds = seededShuffle(questionIds, rng);
+    }
+
+    if (selectedIds.length === 0) {
+      throw ApiError.badRequest('No questions match the required configuration for this test.');
+    }
 
     const optionOrders = {};
-    for (const qId of questionIds) {
-      optionOrders[qId.toString()] = shuffleArray(['A', 'B', 'C', 'D']);
+    for (const qId of selectedIds) {
+      const q = qMap[qId.toString()];
+      if (!q) continue;
+      const optCount = (q.options && q.options.length) || 4;
+      const labels = Array.from({ length: optCount }, (_, i) => String.fromCharCode(65 + i));
+      optionOrders[qId.toString()] = seededShuffle(labels, rng);
     }
 
     const attempt = await ExamAttempt.create({
       studentId,
       testId,
-      questionOrder: shuffledQuestions,
+      questionOrder: selectedIds,
       optionOrders,
       answers: [],
       startTime: now,
       status: 'in_progress',
+      seed,
     });
 
     return attempt;
@@ -127,6 +172,26 @@ const examService = {
       const q = questionMap[qId.toString()];
       if (!q) return null;
 
+      if (q.questionType === 'coding') {
+        return {
+          _id: q._id,
+          questionType: 'coding',
+          questionText: q.questionText,
+          starterCode: q.starterCode || '',
+          allowedLanguages: q.allowedLanguages || [],
+          constraints: q.constraints || '',
+          explanation: q.explanation || '',
+          sampleTestCases: (q.sampleTestCases || []).map(tc => ({
+            input: tc.input || '',
+            expectedOutput: tc.expectedOutput || '',
+            explanation: tc.explanation || '',
+          })),
+          marks: q.marks,
+          subject: q.subject,
+          difficulty: q.difficulty,
+        };
+      }
+
       const optOrder = attempt.optionOrders?.get(qId.toString()) || ['A', 'B', 'C', 'D'];
       const orderedOptions = optOrder.map((label) => {
         const opt = q.options.find((o) => o.label === label);
@@ -135,6 +200,7 @@ const examService = {
 
       return {
         _id: q._id,
+        questionType: q.questionType,
         questionText: q.questionText,
         options: orderedOptions,
         marks: q.marks,
@@ -167,6 +233,15 @@ const examService = {
       },
       questions: orderedQuestions,
       answers: answerMap,
+      codingAnswers: (attempt.codingAnswers || []).reduce((map, ca) => {
+        map[ca.questionId.toString()] = {
+          sourceCode: ca.sourceCode,
+          language: ca.language,
+          passedTestCases: ca.passedTestCases,
+          totalTestCases: ca.totalTestCases,
+        };
+        return map;
+      }, {}),
       timeRemaining: remaining,
     };
   },
@@ -185,6 +260,29 @@ const examService = {
       attempt.answers[existingIndex].selectedOption = selectedOption;
     } else {
       attempt.answers.push({ questionId, selectedOption });
+    }
+
+    await attempt.save();
+    return { saved: true };
+  },
+
+  async saveCodingAnswer(attemptId, studentId, questionId, sourceCode, language) {
+    const attempt = await ExamAttempt.findOne({ _id: attemptId, studentId, status: 'in_progress' });
+    if (!attempt) {
+      throw ApiError.notFound('No active attempt found');
+    }
+
+    const existingIdx = attempt.codingAnswers.findIndex(
+      ca => ca.questionId.toString() === questionId
+    );
+
+    const codingAnswer = { questionId, sourceCode: sourceCode || '', language: language || '' };
+
+    if (existingIdx >= 0) {
+      attempt.codingAnswers[existingIdx].sourceCode = codingAnswer.sourceCode;
+      attempt.codingAnswers[existingIdx].language = codingAnswer.language;
+    } else {
+      attempt.codingAnswers.push(codingAnswer);
     }
 
     await attempt.save();
@@ -210,7 +308,9 @@ const examService = {
       questionMap[q._id.toString()] = q;
     }
 
-    let totalCorrect = 0;
+    let mcqCorrect = 0;
+    let codingObtained = 0;
+    let codingTotal = 0;
 
     for (const answer of attempt.answers) {
       const q = questionMap[answer.questionId.toString()];
@@ -222,28 +322,33 @@ const examService = {
       switch (q.questionType) {
         case 'mcq':
         case 'true_false':
-          if (q.correctOption === selected) totalCorrect++;
+          if (q.correctOption === selected) mcqCorrect++;
           break;
         case 'multiple_select': {
           const selectedArr = selected.split(',').map(s => s.trim()).sort();
           const correctArr = (q.correctOptions || []).sort();
-          if (JSON.stringify(selectedArr) === JSON.stringify(correctArr)) totalCorrect++;
+          if (JSON.stringify(selectedArr) === JSON.stringify(correctArr)) mcqCorrect++;
           break;
         }
         case 'fill_blank': {
           const acceptedAnswers = (q.correctAnswers || []).map(a => a.toLowerCase().trim());
-          if (acceptedAnswers.includes(selected.toLowerCase().trim())) totalCorrect++;
+          if (acceptedAnswers.includes(selected.toLowerCase().trim())) mcqCorrect++;
           break;
         }
-        case 'descriptive':
-          break;
-        case 'coding':
-          break;
+      }
+    }
+
+    for (const codingAnswer of attempt.codingAnswers || []) {
+      const q = questionMap[codingAnswer.questionId.toString()];
+      if (!q || q.questionType !== 'coding') continue;
+      codingTotal += q.marks;
+      if (codingAnswer.totalTestCases > 0 && codingAnswer.passedTestCases === codingAnswer.totalTestCases) {
+        codingObtained += q.marks;
       }
     }
 
     const totalMarks = questionIds.length;
-    const obtainedMarks = totalCorrect;
+    const obtainedMarks = mcqCorrect + codingObtained;
     const isPassed = obtainedMarks >= test.passingMarks;
     const percentage = totalMarks > 0 ? Math.round((obtainedMarks / totalMarks) * 10000) / 100 : 0;
 
@@ -253,8 +358,10 @@ const examService = {
       examAttemptId: attemptId,
       totalMarks,
       obtainedMarks,
-      totalCorrectAnswers: totalCorrect,
-      totalWrongAnswers: attempt.answers.length - totalCorrect,
+      mcqScore: mcqCorrect,
+      codingScore: codingObtained,
+      totalCorrectAnswers: mcqCorrect,
+      totalWrongAnswers: attempt.answers.length - mcqCorrect,
       isPassed,
       percentage,
       isPublished: false,
@@ -282,7 +389,8 @@ const examService = {
       questionMap[q._id.toString()] = q;
     }
 
-    let totalCorrect = 0;
+    let mcqCorrect = 0;
+    let codingObtained = 0;
 
     for (const answer of attempt.answers) {
       const q = questionMap[answer.questionId.toString()];
@@ -294,28 +402,32 @@ const examService = {
       switch (q.questionType) {
         case 'mcq':
         case 'true_false':
-          if (q.correctOption === selected) totalCorrect++;
+          if (q.correctOption === selected) mcqCorrect++;
           break;
         case 'multiple_select': {
           const selectedArr = selected.split(',').map(s => s.trim()).sort();
           const correctArr = (q.correctOptions || []).sort();
-          if (JSON.stringify(selectedArr) === JSON.stringify(correctArr)) totalCorrect++;
+          if (JSON.stringify(selectedArr) === JSON.stringify(correctArr)) mcqCorrect++;
           break;
         }
         case 'fill_blank': {
           const acceptedAnswers = (q.correctAnswers || []).map(a => a.toLowerCase().trim());
-          if (acceptedAnswers.includes(selected.toLowerCase().trim())) totalCorrect++;
+          if (acceptedAnswers.includes(selected.toLowerCase().trim())) mcqCorrect++;
           break;
         }
-        case 'descriptive':
-          break;
-        case 'coding':
-          break;
+      }
+    }
+
+    for (const codingAnswer of attempt.codingAnswers || []) {
+      const q = questionMap[codingAnswer.questionId.toString()];
+      if (!q || q.questionType !== 'coding') continue;
+      if (codingAnswer.totalTestCases > 0 && codingAnswer.passedTestCases === codingAnswer.totalTestCases) {
+        codingObtained += q.marks;
       }
     }
 
     const totalMarks = questionIds.length;
-    const obtainedMarks = totalCorrect;
+    const obtainedMarks = mcqCorrect + codingObtained;
     const isPassed = obtainedMarks >= test.passingMarks;
     const percentage = totalMarks > 0 ? Math.round((obtainedMarks / totalMarks) * 10000) / 100 : 0;
 
@@ -325,8 +437,10 @@ const examService = {
       examAttemptId: attemptId,
       totalMarks,
       obtainedMarks,
-      totalCorrectAnswers: totalCorrect,
-      totalWrongAnswers: attempt.answers.length - totalCorrect,
+      mcqScore: mcqCorrect,
+      codingScore: codingObtained,
+      totalCorrectAnswers: mcqCorrect,
+      totalWrongAnswers: attempt.answers.length - mcqCorrect,
       isPassed,
       percentage,
       isPublished: false,

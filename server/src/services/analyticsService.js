@@ -1,4 +1,4 @@
-const { Student, Test, Question, ExamAttempt, Result, SecurityLog } = require('../models');
+const { Student, Test, Question, ExamAttempt, Result, CodingSubmission } = require('../models');
 
 const analyticsService = {
   async getDashboardStats() {
@@ -76,6 +76,7 @@ const analyticsService = {
       passVsFail,
       completedVsTerminated,
       questionWiseAccuracy,
+      codingQuestionAccuracy,
       collegeWiseParticipation,
       dailyExams,
       dailyAttempts,
@@ -157,6 +158,45 @@ const analyticsService = {
             questionType: { $first: '$question.questionType' },
             totalAttempts: { $sum: 1 },
             correctCount: { $sum: { $cond: ['$answers.isCorrect', 1, 0] } },
+          },
+        },
+        {
+          $project: {
+            questionText: 1,
+            questionType: 1,
+            totalAttempts: 1,
+            correctCount: 1,
+            accuracy: {
+              $cond: [
+                { $gt: ['$totalAttempts', 0] },
+                { $round: [{ $multiply: [{ $divide: ['$correctCount', '$totalAttempts'] }, 100] }, 1] },
+                0,
+              ],
+            },
+          },
+        },
+        { $sort: { accuracy: -1 } },
+        { $limit: 20 },
+      ]),
+      CodingSubmission.aggregate([
+        {
+          $lookup: {
+            from: 'questions',
+            localField: 'questionId',
+            foreignField: '_id',
+            as: 'question',
+          },
+        },
+        { $unwind: { path: '$question', preserveNullAndEmptyArrays: false } },
+        {
+          $group: {
+            _id: '$question._id',
+            questionText: { $first: '$question.questionText' },
+            questionType: { $first: '$question.questionType' },
+            totalAttempts: { $sum: 1 },
+            correctCount: {
+              $sum: { $cond: [{ $eq: ['$passedTestCases', '$totalTestCases'] }, 1, 0] },
+            },
           },
         },
         {
@@ -259,15 +299,85 @@ const analyticsService = {
       count: t.count,
     }));
 
+    const combinedQuestionAccuracy = [...questionWiseAccuracy, ...(codingQuestionAccuracy || [])]
+      .sort((a, b) => b.accuracy - a.accuracy)
+      .slice(0, 20);
+
+    const codingAnalytics = await CodingSubmission.aggregate([
+      {
+        $group: {
+          _id: '$language',
+          count: { $sum: 1 },
+          accepted: { $sum: { $cond: [{ $eq: ['$status', 'accepted'] }, 1, 0] } },
+          avgExecutionTime: { $avg: '$executionTime' },
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+
+    const totalCodingSubmissions = codingAnalytics.reduce((sum, c) => sum + c.count, 0);
+    const totalCodingAccepted = codingAnalytics.reduce((sum, c) => sum + c.accepted, 0);
+    const codingSuccessRate = totalCodingSubmissions > 0
+      ? Math.round((totalCodingAccepted / totalCodingSubmissions) * 10000) / 100
+      : 0;
+
+    const languageUsage = codingAnalytics.map(c => ({
+      language: c._id || 'Unknown',
+      count: c.count,
+      accepted: c.accepted,
+      successRate: c.count > 0 ? Math.round((c.accepted / c.count) * 10000) / 100 : 0,
+      avgTime: Math.round(c.avgExecutionTime || 0),
+    }));
+
+    const departmentCodingPerformance = await CodingSubmission.aggregate([
+      {
+        $lookup: {
+          from: 'students',
+          localField: 'studentId',
+          foreignField: '_id',
+          as: 'student',
+        },
+      },
+      { $unwind: { path: '$student', preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: '$student.branch',
+          totalSubmissions: { $sum: 1 },
+          accepted: { $sum: { $cond: [{ $eq: ['$status', 'accepted'] }, 1, 0] } },
+        },
+      },
+      {
+        $project: {
+          department: '$_id',
+          totalSubmissions: 1,
+          accepted: 1,
+          successRate: {
+            $cond: [
+              { $gt: ['$totalSubmissions', 0] },
+              { $round: [{ $multiply: [{ $divide: ['$accepted', '$totalSubmissions'] }, 100] }, 1] },
+              0,
+            ],
+          },
+        },
+      },
+      { $sort: { totalSubmissions: -1 } },
+    ]);
+
     return {
       avgMarks,
       passFail: passObj,
       departments,
       completedVsTerminated,
-      questionWiseAccuracy,
+      questionWiseAccuracy: combinedQuestionAccuracy,
       collegeWiseParticipation,
       dailyExams,
       dailyAttempts,
+      codingAnalytics: {
+        totalSubmissions: totalCodingSubmissions,
+        successRate: codingSuccessRate,
+        languageUsage,
+        departmentCodingPerformance,
+      },
     };
   },
 };

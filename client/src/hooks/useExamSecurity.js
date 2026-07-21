@@ -86,9 +86,19 @@ export default function useExamSecurity(attemptId, onTerminate) {
       console.log('[Security] Paste attempt blocked');
     };
 
+    const handleCut = (e) => {
+      e.preventDefault();
+      console.log('[Security] Cut attempt blocked');
+    };
+
     const handleContextMenu = (e) => {
       e.preventDefault();
       console.log('[Security] Right-click blocked');
+    };
+
+    const handleDragStart = (e) => {
+      e.preventDefault();
+      console.log('[Security] Drag-drop blocked');
     };
 
     const handleKeyDown = (e) => {
@@ -100,6 +110,22 @@ export default function useExamSecurity(attemptId, onTerminate) {
         e.preventDefault();
         console.log('[Security] F5 refresh blocked');
       }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C') && !e.shiftKey) {
+        e.preventDefault();
+        console.log('[Security] Ctrl+C blocked');
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
+        e.preventDefault();
+        console.log('[Security] Ctrl+V blocked');
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'x' || e.key === 'X')) {
+        e.preventDefault();
+        console.log('[Security] Ctrl+X blocked');
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        console.log('[Security] Ctrl+A blocked');
+      }
     };
 
     window.history.pushState(null, '', window.location.href);
@@ -110,7 +136,9 @@ export default function useExamSecurity(attemptId, onTerminate) {
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
     document.addEventListener('copy', handleCopy);
     document.addEventListener('paste', handlePaste);
+    document.addEventListener('cut', handleCut);
     document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('dragstart', handleDragStart);
     document.addEventListener('keydown', handleKeyDown);
     window.addEventListener('blur', handleWindowBlur);
     window.addEventListener('pagehide', handlePageHide);
@@ -122,7 +150,9 @@ export default function useExamSecurity(attemptId, onTerminate) {
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
       document.removeEventListener('copy', handleCopy);
       document.removeEventListener('paste', handlePaste);
+      document.removeEventListener('cut', handleCut);
       document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('dragstart', handleDragStart);
       document.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('blur', handleWindowBlur);
       window.removeEventListener('pagehide', handlePageHide);

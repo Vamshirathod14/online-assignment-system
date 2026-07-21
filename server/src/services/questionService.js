@@ -64,14 +64,74 @@ const questionService = {
 
     const validDifficulties = ['easy', 'medium', 'hard'];
     const validOptions = ['A', 'B', 'C', 'D'];
+    const validLanguages = ['python', 'java', 'c', 'cpp', 'javascript'];
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowNum = i + 1;
 
-      if (!row.Question || !row.OptionA || !row.OptionB || !row.OptionC || !row.OptionD || !row.CorrectAnswer || !row.Subject) {
+      const qType = (row.Type || 'mcq').toLowerCase().trim();
+
+      if (!row.Question || !row.Subject) {
         results.skipped++;
-        results.errors.push(`Row ${rowNum}: Missing required fields`);
+        results.errors.push(`Row ${rowNum}: Missing Question or Subject`);
+        continue;
+      }
+
+      if (qType === 'coding') {
+        const difficulty = row.Difficulty ? String(row.Difficulty).trim().toLowerCase() : 'medium';
+        if (!validDifficulties.includes(difficulty)) {
+          results.skipped++;
+          results.errors.push(`Row ${rowNum}: Invalid Difficulty "${row.Difficulty}"`);
+          continue;
+        }
+
+        const langs = row.Languages ? String(row.Languages).split(',').map(l => l.trim().toLowerCase()).filter(l => validLanguages.includes(l)) : [];
+        if (langs.length === 0) {
+          results.skipped++;
+          results.errors.push(`Row ${rowNum}: No valid languages specified. Use: python, java, c, cpp, javascript`);
+          continue;
+        }
+
+        const sampleTestCases = [];
+        if (row.SampleInput || row.SampleOutput) {
+          sampleTestCases.push({ input: String(row.SampleInput || ''), expectedOutput: String(row.SampleOutput || '') });
+        }
+
+        const hiddenTestCases = [];
+        if (row.HiddenInput || row.HiddenOutput) {
+          hiddenTestCases.push({ input: String(row.HiddenInput || ''), expectedOutput: String(row.HiddenOutput || '') });
+        }
+
+        try {
+          await Question.create({
+            questionText: String(row.Question).trim(),
+            questionType: 'coding',
+            starterCode: row.StarterCode ? String(row.StarterCode).trim() : '',
+            allowedLanguages: langs,
+            constraints: row.Constraints ? String(row.Constraints).trim() : '',
+            explanation: row.Explanation ? String(row.Explanation).trim() : '',
+            sampleTestCases,
+            hiddenTestCases,
+            difficulty,
+            marks: Number(row.Marks) || 1,
+            subject: String(row.Subject).trim(),
+            timeLimit: Number(row.TimeLimit) || 5000,
+            memoryLimit: Number(row.MemoryLimit) || 256,
+            createdBy,
+          });
+          results.inserted++;
+        } catch (err) {
+          results.failed++;
+          results.errors.push(`Row ${rowNum}: ${err.message}`);
+        }
+        continue;
+      }
+
+      // MCQ / other types
+      if (!row.OptionA || !row.OptionB || !row.OptionC || !row.OptionD || !row.CorrectAnswer) {
+        results.skipped++;
+        results.errors.push(`Row ${rowNum}: Missing required MCQ fields`);
         continue;
       }
 
@@ -92,7 +152,7 @@ const questionService = {
       try {
         await Question.create({
           questionText: String(row.Question).trim(),
-          questionType: 'mcq',
+          questionType: qType,
           options: [
             { label: 'A', text: String(row.OptionA).trim() },
             { label: 'B', text: String(row.OptionB).trim() },
@@ -101,7 +161,7 @@ const questionService = {
           ],
           correctOption: correctAnswer,
           difficulty,
-          marks: 1,
+          marks: Number(row.Marks) || 1,
           subject: String(row.Subject).trim(),
           createdBy,
         });
@@ -168,10 +228,15 @@ const questionService = {
       } else if (q.questionType === 'fill_blank') {
         row['Correct Answers'] = (q.correctAnswers || []).join(', ');
       } else if (q.questionType === 'coding') {
-        row['Language'] = q.language || '';
+        row['Languages'] = (q.allowedLanguages || []).join(', ');
         row['Starter Code'] = q.starterCode || '';
-        row['Input Example'] = q.inputExample || '';
-        row['Output Example'] = q.outputExample || '';
+        row['Constraints'] = q.constraints || '';
+        row['Explanation'] = q.explanation || '';
+        row['Sample Input'] = (q.sampleTestCases || []).map(tc => tc.input).join(' || ');
+        row['Sample Output'] = (q.sampleTestCases || []).map(tc => tc.expectedOutput).join(' || ');
+        row['Hidden Test Cases Count'] = (q.hiddenTestCases || []).length;
+        row['Time Limit (ms)'] = q.timeLimit || 5000;
+        row['Memory Limit (MB)'] = q.memoryLimit || 256;
       }
       return row;
     });

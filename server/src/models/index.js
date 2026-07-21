@@ -9,4 +9,5 @@ module.exports = {
   SecurityLog: require('./SecurityLog'),
   College: require('./College'),
   OtpVerification: require('./OtpVerification'),
+  CodingSubmission: require('./CodingSubmission'),
 };

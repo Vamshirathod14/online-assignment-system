@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import {
   Search, Download, Eye, EyeOff, CheckCircle2, X, AlertTriangle,
-  RefreshCw, BarChart3, ChevronLeft
+  RefreshCw, BarChart3, ChevronLeft, Code
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 export default function AdminResults() {
+  const navigate = useNavigate();
   const [testStats, setTestStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTest, setSelectedTest] = useState(null);
@@ -114,6 +116,7 @@ export default function AdminResults() {
       case 'in_progress': return <span className="badge-info">In Progress</span>;
       case 'timed_out': return <span className="badge-warning">Timed Out</span>;
       case 'terminated': return <span className="badge-danger">Terminated</span>;
+      case 'reset': return <span className="badge-warning">Reset</span>;
       default: return <span className="badge-neutral">{status || 'N/A'}</span>;
     }
   };
@@ -229,6 +232,9 @@ export default function AdminResults() {
               <Eye className="w-4 h-4" /> Publish All
             </button>
           )}
+          <button onClick={() => navigate('/admin/coding-submissions')} className="btn-secondary text-sm">
+            <Code className="w-4 h-4" /> Submissions
+          </button>
           <button onClick={handleExport} className="btn-secondary text-sm">
             <Download className="w-4 h-4" /> Export CSV
           </button>
@@ -326,7 +332,14 @@ export default function AdminResults() {
                     </td>
                     <td className="table-cell text-gray-600 text-xs">{result.studentId?.collegeName}</td>
                     <td className="table-cell text-gray-600 text-xs">{result.studentId?.branch}</td>
-                    <td className="table-cell font-semibold text-gray-900">{result.obtainedMarks}/{result.totalMarks}</td>
+                    <td className="table-cell">
+                      <div className="font-semibold text-gray-900">{result.obtainedMarks}/{result.totalMarks}</div>
+                      {(result.mcqScore > 0 || result.codingScore > 0) && (
+                        <div className="text-[10px] text-gray-500 mt-0.5">
+                          MCQ: {result.mcqScore} &middot; Code: {result.codingScore}
+                        </div>
+                      )}
+                    </td>
                     <td className="table-cell">
                       <span className={`font-semibold ${getScoreColor(result.percentage)}`}>{result.percentage}%</span>
                     </td>
@@ -343,7 +356,7 @@ export default function AdminResults() {
                     </td>
                     <td className="table-cell">
                       <div className="flex gap-1">
-                        {result.attempt?.status === 'terminated' && (
+                        {result.attempt?.status && ['terminated', 'completed', 'timed_out'].includes(result.attempt.status) && (
                           <button onClick={() => handleResetExam(result.attempt._id)}
                             className="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors" title="Reset Exam">
                             <RefreshCw className="w-3.5 h-3.5" />

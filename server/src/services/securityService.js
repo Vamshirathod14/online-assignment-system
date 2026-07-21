@@ -100,16 +100,13 @@ const securityService = {
     const attempt = await ExamAttempt.findById(examAttemptId);
     if (!attempt) throw ApiError.notFound('Exam attempt not found');
     if (attempt.status === 'in_progress') throw ApiError.badRequest('Exam is still in progress — cannot reset');
+    if (attempt.status === 'reset') throw ApiError.badRequest('Exam has already been reset');
 
     const previousStatus = attempt.status;
 
     await Result.deleteOne({ examAttemptId: attempt._id });
 
-    attempt.status = 'in_progress';
-    attempt.terminatedReason = null;
-    attempt.endTime = null;
-    attempt.answers = [];
-    attempt.startTime = new Date();
+    attempt.status = 'reset';
     await attempt.save();
 
     await SecurityLog.create({

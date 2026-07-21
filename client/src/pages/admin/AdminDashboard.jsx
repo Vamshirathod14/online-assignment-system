@@ -10,6 +10,7 @@ import {
   Award,
   Shield,
   Activity,
+  Code,
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -226,6 +227,83 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <p className="text-sm text-gray-400 text-center py-8">No data available</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Coding Analytics Section */}
+      {chartData?.codingAnalytics && chartData.codingAnalytics.totalSubmissions > 0 && (
+        <div className="mt-8">
+          <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Code className="w-5 h-5 text-primary-600" /> Coding Analytics
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div className="stat-card border-l-4 border-l-primary-500">
+              <p className="text-sm font-medium text-gray-500">Total Submissions</p>
+              <p className="text-3xl font-bold text-gray-900">{chartData.codingAnalytics.totalSubmissions}</p>
+            </div>
+            <div className="stat-card border-l-4 border-l-green-500">
+              <p className="text-sm font-medium text-gray-500">Success Rate</p>
+              <p className="text-3xl font-bold text-green-600">{chartData.codingAnalytics.successRate}%</p>
+            </div>
+            <div className="stat-card border-l-4 border-l-violet-500">
+              <p className="text-sm font-medium text-gray-500">Languages Used</p>
+              <p className="text-3xl font-bold text-gray-900">{chartData.codingAnalytics.languageUsage?.length || 0}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {chartData.codingAnalytics.languageUsage?.length > 0 && (
+              <div className="section-card p-6">
+                <h3 className="font-semibold text-gray-900 mb-4">Language Usage</h3>
+                <Bar
+                  data={{
+                    labels: chartData.codingAnalytics.languageUsage.map(l => l.language),
+                    datasets: [
+                      {
+                        label: 'Submissions',
+                        data: chartData.codingAnalytics.languageUsage.map(l => l.count),
+                        backgroundColor: '#0056D2',
+                        borderRadius: 6,
+                      },
+                      {
+                        label: 'Accepted',
+                        data: chartData.codingAnalytics.languageUsage.map(l => l.accepted),
+                        backgroundColor: '#22c55e',
+                        borderRadius: 6,
+                      },
+                    ],
+                  }}
+                  options={{
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true } },
+                  }}
+                />
+              </div>
+            )}
+
+            {chartData.codingAnalytics.departmentCodingPerformance?.length > 0 && (
+              <div className="section-card p-6">
+                <h3 className="font-semibold text-gray-900 mb-4">Dept-wise Coding Success</h3>
+                <Bar
+                  data={{
+                    labels: chartData.codingAnalytics.departmentCodingPerformance.map(d => d.department || 'Unknown'),
+                    datasets: [{
+                      label: 'Success Rate %',
+                      data: chartData.codingAnalytics.departmentCodingPerformance.map(d => d.successRate),
+                      backgroundColor: '#FF7A00',
+                      borderRadius: 6,
+                    }],
+                  }}
+                  options={{
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, max: 100 } },
+                  }}
+                />
+              </div>
             )}
           </div>
         </div>
