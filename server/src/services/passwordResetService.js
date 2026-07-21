@@ -1,7 +1,7 @@
-const { OtpVerification, Student, Admin } = require('../models');
-const ApiError = require('../utils/ApiError');
-const bcrypt = require('bcryptjs');
-const nodemailer = require('nodemailer');
+const { OtpVerification, Student, Admin } = require("../models");
+const ApiError = require("../utils/ApiError");
+const bcrypt = require("bcryptjs");
+const nodemailer = require("nodemailer");
 
 let transporter = null;
 
@@ -16,14 +16,29 @@ function getTransporter() {
   transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST || "smtp.gmail.com",
     port: Number(process.env.EMAIL_PORT) || 587,
-    secure: Number(process.env.EMAIL_PORT) === 465,
+    secure: false,
     requireTLS: true,
-    family: 4, // Force IPv4
+
+    // Force IPv4
+    family: 4,
+
+    // Prevent hanging forever
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
 
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
+  });
+
+  transporter.verify((error, success) => {
+    if (error) {
+      console.error("[SMTP VERIFY ERROR]", error);
+    } else {
+      console.log("[SMTP] Server is ready to send emails.");
+    }
   });
 
   return transporter;
@@ -33,7 +48,7 @@ async function sendEmail(to, subject, html) {
   const t = getTransporter();
 
   if (!t) {
-    console.log(`[Email] SMTP not configured. Would send to ${to}: ${subject}`);
+    console.log(`[Email] SMTP not configured. Would send to ${to}`);
     return false;
   }
 
@@ -47,16 +62,20 @@ async function sendEmail(to, subject, html) {
       html,
     });
 
-    console.log(`[Email] Mail sent successfully: ${info.messageId}`);
+    console.log("[Email] Mail sent successfully!");
+    console.log(info);
+
     return true;
   } catch (err) {
-    console.error("[Email] SMTP ERROR:", err);
+    console.error("[SMTP SEND ERROR]");
+    console.error(err);
     throw err;
   }
 }
 
 const generateOtp = async (email, role) => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
   await OtpVerification.deleteMany({
@@ -73,20 +92,11 @@ const generateOtp = async (email, role) => {
   });
 
   const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 400px; margin: 0 auto;">
-      <h2 style="color:#0056D2;">CoreSoft - Password Reset</h2>
-
-      <p>Your OTP for password reset is:</p>
-
-      <div style="background:#f3f4f6;padding:16px;text-align:center;border-radius:8px;margin:16px 0;">
-        <span style="font-size:28px;font-weight:bold;letter-spacing:6px;color:#1f2937;">
-          ${otp}
-        </span>
-      </div>
-
-      <p style="color:#6b7280;font-size:14px;">
-        This OTP expires in 10 minutes. Do not share it with anyone.
-      </p>
+    <div style="font-family:Arial,sans-serif">
+      <h2>CoreSoft Password Reset</h2>
+      <p>Your OTP is:</p>
+      <h1>${otp}</h1>
+      <p>This OTP expires in 10 minutes.</p>
     </div>
   `;
 
@@ -110,9 +120,7 @@ const verifyOtp = async (email, otp, role) => {
     email,
     role,
     used: false,
-    expiresAt: {
-      $gt: new Date(),
-    },
+    expiresAt: { $gt: new Date() },
   }).sort({ createdAt: -1 });
 
   if (!record) {
@@ -129,25 +137,18 @@ const verifyOtp = async (email, otp, role) => {
 const resetPassword = async (email, otp, newPassword, role) => {
   const record = await verifyOtp(email, otp, role);
 
-  const salt = await bcrypt.genSalt(10);
-  const hashedPassword = await bcrypt.hash(newPassword, salt);
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
 
   const Model = role === "student" ? Student : Admin;
 
   const user = await Model.findOneAndUpdate(
     { email },
-    {
-      password: hashedPassword,
-    },
-    {
-      new: true,
-    }
+    { password: hashedPassword },
+    { new: true }
   );
 
   if (!user) {
-    throw ApiError.notFound(
-      `${role.charAt(0).toUpperCase() + role.slice(1)} not found`
-    );
+    throw ApiError.notFound(`${role} not found`);
   }
 
   record.used = true;
