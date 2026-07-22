@@ -57,18 +57,20 @@ function TestCountdownCard({ test, now, onStart, onResume, startingTest }) {
     availabilityStatus = 'Upcoming';
     statusColor = 'text-blue-700';
     statusBg = 'bg-blue-50 border-blue-200';
+    const fc = formatCountdown(startDate.getTime() - now);
+    countdownLabel = fc ? `Starts in ${fc}` : null;
   } else if (now >= startDate && now <= endDate) {
     availabilityStatus = 'Active';
     statusColor = 'text-green-700';
     statusBg = 'bg-green-50 border-green-200';
+    const fc = formatCountdown(endDate.getTime() - now);
+    countdownLabel = fc ? `Ends in ${fc}` : null;
   } else {
     availabilityStatus = 'Expired';
     statusColor = 'text-red-700';
     statusBg = 'bg-red-50 border-red-200';
+    countdownLabel = 'Exam Closed';
   }
-
-  const fc = formatCountdown(endDate.getTime() - now);
-  countdownLabel = fc ? `Ends in ${fc}` : null;
 
   const isActiveWindow = availabilityStatus === 'Active';
   const canStart = isDbActive && isActiveWindow && !isCompleted && !isInProgress && !isTerminated;
@@ -131,7 +133,9 @@ function TestCountdownCard({ test, now, onStart, onResume, startingTest }) {
         <div className="border-t border-gray-100 pt-3 mb-3">
           {countdownLabel && (
             <div className={`flex items-center gap-2 text-sm font-bold font-mono ${
-              isActiveWindow ? 'text-green-700' : 'text-blue-700'
+              isActiveWindow ? 'text-green-700'
+              : availabilityStatus === 'Expired' ? 'text-red-600'
+              : 'text-blue-700'
             }`}>
               <Timer className="w-4 h-4 flex-shrink-0" />
               <span className="tracking-wide">{countdownLabel}</span>
