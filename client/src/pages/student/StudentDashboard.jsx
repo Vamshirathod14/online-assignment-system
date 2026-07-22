@@ -14,6 +14,7 @@ import {
   BookOpen,
   ArrowRight,
   Timer,
+  Award,
 } from 'lucide-react';
 
 function formatCountdown(ms) {
@@ -46,16 +47,6 @@ function TestCountdownCard({ test, now, onStart, onResume, startingTest }) {
   const isTerminated = test.studentStatus === 'terminated';
   const isDbActive = test.status === 'active';
 
-  console.log(`[Countdown] ${test.title}`, {
-    NOW: new Date(now).toISOString(),
-    START: startDate.toISOString(),
-    END: endDate.toISOString(),
-    'Remaining(ms)': endDate.getTime() - now,
-    Countdown: formatCountdown(endDate.getTime() - now),
-    duration: test.duration,
-    isDbActive,
-  });
-
   let availabilityStatus, statusColor, statusBg, countdownLabel;
 
   if (!isDbActive) {
@@ -66,25 +57,24 @@ function TestCountdownCard({ test, now, onStart, onResume, startingTest }) {
     availabilityStatus = 'Upcoming';
     statusColor = 'text-blue-700';
     statusBg = 'bg-blue-50 border-blue-200';
-    const fc = formatCountdown(startDate.getTime() - now);
-    countdownLabel = fc ? `Starts in ${fc}` : null;
   } else if (now >= startDate && now <= endDate) {
     availabilityStatus = 'Active';
     statusColor = 'text-green-700';
     statusBg = 'bg-green-50 border-green-200';
-    const fc = formatCountdown(endDate.getTime() - now);
-    countdownLabel = fc ? `Ends in ${fc}` : null;
   } else {
     availabilityStatus = 'Expired';
     statusColor = 'text-red-700';
     statusBg = 'bg-red-50 border-red-200';
   }
 
+  const fc = formatCountdown(endDate.getTime() - now);
+  countdownLabel = fc ? `Ends in ${fc}` : null;
+
   const isActiveWindow = availabilityStatus === 'Active';
   const canStart = isDbActive && isActiveWindow && !isCompleted && !isInProgress && !isTerminated;
 
   return (
-    <div className={`group border rounded-2xl transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 bg-white ${
+    <div className={`group flex flex-col rounded-2xl bg-white border shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:scale-[1.02] ${
       isCompleted ? 'border-green-200'
       : isInProgress ? 'border-amber-200'
       : isTerminated ? 'border-red-200'
@@ -92,125 +82,117 @@ function TestCountdownCard({ test, now, onStart, onResume, startingTest }) {
       : availabilityStatus === 'Upcoming' ? 'border-blue-200'
       : 'border-gray-200'
     }`}>
-      <div className="flex flex-col md:flex-row">
-        {/* Left: Title, Branch, Description */}
-        <div className="flex-1 min-w-0 p-5 md:p-6">
-          <div className="flex items-center gap-2.5 mb-2 flex-wrap">
-            <h3 className="font-bold text-gray-900 text-lg group-hover:text-primary-700 transition-colors">{test.title}</h3>
-            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${statusBg} ${statusColor}`}>
-              {isActiveWindow && <span className="inline-block w-1.5 h-1.5 bg-green-500 rounded-full mr-1 animate-pulse" />}
-              {availabilityStatus}
-            </span>
-            {isCompleted && (
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">
-                <CheckCircle2 className="inline w-3 h-3 mr-0.5 -mt-0.5" /> Completed
-              </span>
-            )}
-            {isInProgress && (
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                In Progress
-              </span>
-            )}
-            {isTerminated && (
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
-                Terminated
-              </span>
-            )}
-          </div>
-          {test.branch && (
-            <p className="text-sm text-gray-500 mb-1">{test.branch}</p>
-          )}
-          {test.description && (
-            <p className="text-sm text-gray-400 line-clamp-2">{test.description}</p>
-          )}
+      <div className="flex flex-col flex-1 p-5">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <h3 className="font-bold text-gray-900 text-base leading-snug group-hover:text-primary-700 transition-colors">{test.title}</h3>
+          <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${statusBg} ${statusColor}`}>
+            {isActiveWindow && <span className="inline-block w-1.5 h-1.5 bg-green-500 rounded-full mr-1 animate-pulse" />}
+            {availabilityStatus}
+          </span>
         </div>
+        {test.branch && <p className="text-xs text-gray-500 font-medium mb-1">{test.branch}</p>}
+        {test.description && <p className="text-xs text-gray-400 line-clamp-2 mb-3">{test.description}</p>}
 
-        {/* Center: Duration, Questions, Marks */}
-        <div className="flex items-center gap-6 px-5 md:px-6 py-4 md:py-6 border-t md:border-t-0 md:border-l border-gray-100 bg-gray-50/50 md:w-56 flex-shrink-0">
-          <div className="flex flex-col items-center gap-1">
-            <Clock className="w-4 h-4 text-gray-400" />
-            <span className="text-sm font-bold text-gray-900">{test.duration}m</span>
-            <span className="text-[11px] text-gray-400">Duration</span>
+        {isCompleted && (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200 mb-3 w-fit">
+            <CheckCircle2 className="w-3 h-3" /> Completed
+          </span>
+        )}
+        {isInProgress && (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 mb-3 w-fit">
+            In Progress
+          </span>
+        )}
+        {isTerminated && (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 mb-3 w-fit">
+            Terminated
+          </span>
+        )}
+
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 mb-4 text-sm">
+          <div className="flex items-center gap-1.5 text-gray-600">
+            <Clock className="w-3.5 h-3.5 text-gray-400" />
+            <span className="font-medium">{test.duration} min</span>
           </div>
-          <div className="flex flex-col items-center gap-1">
-            <BookOpen className="w-4 h-4 text-gray-400" />
-            <span className="text-sm font-bold text-gray-900">{test.totalQuestions}</span>
-            <span className="text-[11px] text-gray-400">Questions</span>
+          <div className="flex items-center gap-1.5 text-gray-600">
+            <BookOpen className="w-3.5 h-3.5 text-gray-400" />
+            <span className="font-medium">{test.totalQuestions} Qs</span>
           </div>
-          <div className="flex flex-col items-center gap-1">
-            <Target className="w-4 h-4 text-gray-400" />
-            <span className="text-sm font-bold text-gray-900">{test.totalMarks}</span>
-            <span className="text-[11px] text-gray-400">Marks</span>
+          <div className="flex items-center gap-1.5 text-gray-600">
+            <Target className="w-3.5 h-3.5 text-gray-400" />
+            <span className="font-medium">{test.totalMarks} Marks</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-gray-600">
+            <Award className="w-3.5 h-3.5 text-gray-400" />
+            <span className="font-medium">Pass: {test.passingMarks}</span>
           </div>
         </div>
 
-        {/* Right: Countdown, Dates, Action */}
-        <div className="flex flex-col items-stretch justify-between p-5 md:p-6 md:w-64 flex-shrink-0 gap-4">
-          {/* Countdown */}
-          <div className="space-y-2">
-            {countdownLabel && (
-              <div className={`flex items-center gap-2 text-sm font-bold font-mono ${
-                isActiveWindow ? 'text-green-700' : 'text-blue-700'
-              }`}>
-                <Timer className="w-4 h-4 flex-shrink-0" />
-                <span className="tracking-wide">{countdownLabel}</span>
-              </div>
-            )}
-            {!isDbActive && (
-              <p className="text-sm text-gray-500 font-medium">Test unavailable — admin has deactivated it.</p>
-            )}
-            {availabilityStatus === 'Expired' && !isCompleted && (
-              <p className="text-sm text-red-500 font-medium">This assessment has expired.</p>
-            )}
+        <div className="border-t border-gray-100 pt-3 mb-3">
+          {countdownLabel && (
+            <div className={`flex items-center gap-2 text-sm font-bold font-mono ${
+              isActiveWindow ? 'text-green-700' : 'text-blue-700'
+            }`}>
+              <Timer className="w-4 h-4 flex-shrink-0" />
+              <span className="tracking-wide">{countdownLabel}</span>
+            </div>
+          )}
+          {!isDbActive && (
+            <p className="text-xs text-gray-500 font-medium">Test unavailable — admin has deactivated it.</p>
+          )}
+          {availabilityStatus === 'Expired' && !isCompleted && (
+            <p className="text-xs text-red-500 font-medium">This assessment has expired.</p>
+          )}
+          <div className="flex flex-col gap-0.5 mt-2">
             <div className="flex items-center gap-1.5 text-xs text-gray-500">
-              <Calendar className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+              <Calendar className="w-3 h-3 text-gray-400 flex-shrink-0" />
               <span>{formatDate(startDate)} — {formatDate(endDate)}</span>
             </div>
-            <div className="text-xs text-gray-400">
-              {formatTime(startDate)} — {formatTime(endDate)}
+            <div className="flex items-center gap-1.5 text-xs text-gray-400">
+              <Clock className="w-3 h-3 flex-shrink-0" />
+              <span>{formatTime(startDate)} — {formatTime(endDate)}</span>
             </div>
           </div>
-
-          {/* Action Button */}
-          <div className="flex-shrink-0">
-            {isCompleted ? (
-              <button className="w-full btn bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 text-sm font-semibold">
-                <CheckCircle2 className="w-4 h-4" /> Completed
-              </button>
-            ) : isInProgress ? (
-              <button
-                onClick={() => onResume(test._id)}
-                className="w-full btn bg-amber-500 text-white hover:bg-amber-600 shadow-sm text-sm font-semibold"
-              >
-                <PlayCircle className="w-4 h-4" /> Resume Exam
-              </button>
-            ) : isTerminated ? (
-              <button className="w-full btn bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 text-sm font-semibold cursor-not-allowed" disabled>
-                <AlertTriangle className="w-4 h-4" /> Terminated
-              </button>
-            ) : !isDbActive ? (
-              <button className="w-full btn bg-gray-50 text-gray-400 border border-gray-200 text-sm font-semibold cursor-not-allowed" disabled>
-                Inactive
-              </button>
-            ) : (
-              <button
-                onClick={() => onStart(test._id)}
-                disabled={!canStart || startingTest === test._id}
-                className={`w-full btn text-sm font-semibold shadow-sm ${
-                  canStart
-                    ? 'btn-primary'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
-                }`}
-              >
-                {startingTest === test._id ? (
-                  <span className="flex items-center justify-center gap-2"><span className="loading-spinner" /> Starting...</span>
-                ) : (
-                  <span className="flex items-center justify-center gap-1"><PlayCircle className="w-4 h-4" /> Start Exam</span>
-                )}
-              </button>
-            )}
-          </div>
         </div>
+      </div>
+
+      <div className="px-5 pb-5 mt-auto">
+        {isCompleted ? (
+          <button className="w-full btn bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 text-sm font-semibold">
+            <CheckCircle2 className="w-4 h-4" /> Completed
+          </button>
+        ) : isInProgress ? (
+          <button
+            onClick={() => onResume(test._id)}
+            className="w-full btn bg-accent-500 text-white hover:bg-accent-600 shadow-sm text-sm font-semibold"
+          >
+            <PlayCircle className="w-4 h-4" /> Resume Exam
+          </button>
+        ) : isTerminated ? (
+          <button className="w-full btn bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 text-sm font-semibold cursor-not-allowed" disabled>
+            <AlertTriangle className="w-4 h-4" /> Terminated
+          </button>
+        ) : !isDbActive ? (
+          <button className="w-full btn bg-gray-50 text-gray-400 border border-gray-200 text-sm font-semibold cursor-not-allowed" disabled>
+            Inactive
+          </button>
+        ) : (
+          <button
+            onClick={() => onStart(test._id)}
+            disabled={!canStart || startingTest === test._id}
+            className={`w-full btn text-sm font-semibold shadow-sm ${
+              canStart
+                ? 'btn-primary'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+            }`}
+          >
+            {startingTest === test._id ? (
+              <span className="flex items-center justify-center gap-2"><span className="loading-spinner" /> Starting...</span>
+            ) : (
+              <span className="flex items-center justify-center gap-1"><PlayCircle className="w-4 h-4" /> Start Exam</span>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -336,7 +318,7 @@ export default function StudentDashboard() {
             <p className="text-sm text-gray-400 mt-1">Check back later for new assignments</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {tests.map((test) => (
               <TestCountdownCard
                 key={test._id}
