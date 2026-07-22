@@ -21,6 +21,22 @@ const initialFormData = {
   status: 'inactive',
 };
 
+function datetimeLocalToISO(value) {
+  if (!value) return value;
+  return new Date(value).toISOString();
+}
+
+function isoToDatetimeLocal(isoString) {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const h = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${y}-${m}-${day}T${h}:${min}`;
+}
+
 export default function AdminTests() {
   const navigate = useNavigate();
   const [tests, setTests] = useState([]);
@@ -91,11 +107,16 @@ export default function AdminTests() {
     setApiError('');
     if (!validate()) return;
     try {
+      const submissionData = {
+        ...formData,
+        startDate: datetimeLocalToISO(formData.startDate),
+        endDate: datetimeLocalToISO(formData.endDate),
+      };
       let newTestId = editingId;
       if (editingId) {
-        await api.put(`/tests/${editingId}`, formData);
+        await api.put(`/tests/${editingId}`, submissionData);
       } else {
-        const { data } = await api.post('/tests', formData);
+        const { data } = await api.post('/tests', submissionData);
         newTestId = data.data._id;
       }
       setShowForm(false);
@@ -123,8 +144,8 @@ export default function AdminTests() {
       trueFalseRequired: test.trueFalseRequired || '',
       fillBlanksRequired: test.fillBlanksRequired || '',
       codingRequired: test.codingRequired || '',
-      startDate: test.startDate ? new Date(test.startDate).toISOString().slice(0, 16) : '',
-      endDate: test.endDate ? new Date(test.endDate).toISOString().slice(0, 16) : '',
+      startDate: test.startDate ? isoToDatetimeLocal(test.startDate) : '',
+      endDate: test.endDate ? isoToDatetimeLocal(test.endDate) : '',
       status: test.status,
     });
     setEditingId(test._id);

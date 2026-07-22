@@ -46,6 +46,16 @@ function TestCountdownCard({ test, now, onStart, onResume, startingTest }) {
   const isTerminated = test.studentStatus === 'terminated';
   const isDbActive = test.status === 'active';
 
+  console.log(`[Countdown] ${test.title}`, {
+    NOW: new Date(now).toISOString(),
+    START: startDate.toISOString(),
+    END: endDate.toISOString(),
+    'Remaining(ms)': endDate.getTime() - now,
+    Countdown: formatCountdown(endDate.getTime() - now),
+    duration: test.duration,
+    isDbActive,
+  });
+
   let availabilityStatus, statusColor, statusBg, countdownLabel;
 
   if (!isDbActive) {
