@@ -566,9 +566,15 @@ export default function StudentExam() {
                 <ChevronLeft className="w-4 h-4" /> Previous
               </button>
               <span className="text-xs text-gray-400 font-medium">{currentQ + 1} / {questions.length}</span>
-              <button onClick={() => setCurrentQ((prev) => Math.min(questions.length - 1, prev + 1))} disabled={currentQ === questions.length - 1 || terminated} className="btn-primary">
-                Next <ChevronRight className="w-4 h-4" />
-              </button>
+              {currentQ === questions.length - 1 ? (
+                <button onClick={handleSubmit} disabled={submitting || terminated} className="btn bg-green-600 text-white hover:bg-green-700 active:bg-green-800 shadow-sm">
+                  <Send className="w-4 h-4" /> Submit Exam
+                </button>
+              ) : (
+                <button onClick={() => setCurrentQ((prev) => prev + 1)} disabled={terminated} className="btn-primary">
+                  Next <ChevronRight className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -25,9 +25,17 @@ function formatCountdown(ms) {
   const seconds = totalSeconds % 60;
   const pad = (n) => String(n).padStart(2, '0');
   if (days > 0) {
-    return { label: `${days}d ${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`, large: true };
+    return `${days}d ${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`;
   }
-  return { label: `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`, large: false };
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+function formatDate(date) {
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatTime(date) {
+  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
 function TestCountdownCard({ test, now, onStart, onResume, startingTest }) {
@@ -36,135 +44,162 @@ function TestCountdownCard({ test, now, onStart, onResume, startingTest }) {
   const isCompleted = test.studentStatus === 'completed';
   const isInProgress = test.studentStatus === 'in_progress';
   const isTerminated = test.studentStatus === 'terminated';
+  const isDbActive = test.status === 'active';
 
-  let status, statusColor, statusBg, countdownMs, countdownLabel;
+  let availabilityStatus, statusColor, statusBg, countdownLabel;
 
-  if (isCompleted) {
-    status = 'Completed';
-    statusColor = 'text-accent-700';
-    statusBg = 'bg-accent-50 border-accent-200';
-  } else if (isInProgress) {
-    status = 'In Progress';
-    statusColor = 'text-amber-700';
-    statusBg = 'bg-amber-50 border-amber-200';
-  } else if (isTerminated) {
-    status = 'Terminated';
-    statusColor = 'text-red-700';
-    statusBg = 'bg-red-50 border-red-200';
+  if (!isDbActive) {
+    availabilityStatus = 'Inactive';
+    statusColor = 'text-gray-600';
+    statusBg = 'bg-gray-50 border-gray-200';
   } else if (now < startDate) {
-    status = 'Upcoming';
-    statusColor = 'text-amber-700';
-    statusBg = 'bg-amber-50 border-amber-200';
-    countdownMs = startDate.getTime() - now;
-    const fc = formatCountdown(countdownMs);
-    countdownLabel = fc ? `Starts in ${fc.label}` : null;
-  } else if (now >= startDate && now <= endDate && test.status === 'active') {
-    status = 'Live Now';
-    statusColor = 'text-accent-700';
-    statusBg = 'bg-accent-50 border-accent-200';
-    countdownMs = endDate.getTime() - now;
-    const fc = formatCountdown(countdownMs);
-    countdownLabel = fc ? `Ends in ${fc.label}` : null;
+    availabilityStatus = 'Upcoming';
+    statusColor = 'text-blue-700';
+    statusBg = 'bg-blue-50 border-blue-200';
+    const fc = formatCountdown(startDate.getTime() - now);
+    countdownLabel = fc ? `Starts in ${fc}` : null;
+  } else if (now >= startDate && now <= endDate) {
+    availabilityStatus = 'Active';
+    statusColor = 'text-green-700';
+    statusBg = 'bg-green-50 border-green-200';
+    const fc = formatCountdown(endDate.getTime() - now);
+    countdownLabel = fc ? `Ends in ${fc}` : null;
   } else {
-    status = 'Ended';
+    availabilityStatus = 'Expired';
     statusColor = 'text-red-700';
     statusBg = 'bg-red-50 border-red-200';
   }
 
-  const canStart = test.status === 'active' && now >= startDate && now <= endDate && !isCompleted && !isInProgress && !isTerminated;
-  const isEnded = now > endDate;
-  const isUpcoming = now < startDate;
-
-  const cardBorder = isCompleted
-    ? 'border-accent-200'
-    : isInProgress
-      ? 'border-amber-200'
-      : isTerminated || isEnded
-        ? 'border-red-200'
-        : canStart
-          ? 'border-accent-300'
-          : 'border-amber-200';
+  const isActiveWindow = availabilityStatus === 'Active';
+  const canStart = isDbActive && isActiveWindow && !isCompleted && !isInProgress && !isTerminated;
 
   return (
-    <div className={`border ${cardBorder} rounded-2xl p-5 transition-all duration-300 hover:shadow-md ${
-      canStart ? 'bg-gradient-to-br from-accent-50/50 to-white' : 'bg-white'
+    <div className={`group border rounded-2xl transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 bg-white ${
+      isCompleted ? 'border-green-200'
+      : isInProgress ? 'border-amber-200'
+      : isTerminated ? 'border-red-200'
+      : isActiveWindow ? 'border-green-300'
+      : availabilityStatus === 'Upcoming' ? 'border-blue-200'
+      : 'border-gray-200'
     }`}>
-      <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <h3 className="font-bold text-gray-900 text-lg">{test.title}</h3>
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${statusBg} ${statusColor}`}>
-              {status === 'Live Now' && <span className="inline-block w-1.5 h-1.5 bg-accent-500 rounded-full mr-1.5 animate-pulse" />}
-              {status}
+      <div className="flex flex-col md:flex-row">
+        {/* Left: Title, Branch, Description */}
+        <div className="flex-1 min-w-0 p-5 md:p-6">
+          <div className="flex items-center gap-2.5 mb-2 flex-wrap">
+            <h3 className="font-bold text-gray-900 text-lg group-hover:text-primary-700 transition-colors">{test.title}</h3>
+            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${statusBg} ${statusColor}`}>
+              {isActiveWindow && <span className="inline-block w-1.5 h-1.5 bg-green-500 rounded-full mr-1 animate-pulse" />}
+              {availabilityStatus}
             </span>
+            {isCompleted && (
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">
+                <CheckCircle2 className="inline w-3 h-3 mr-0.5 -mt-0.5" /> Completed
+              </span>
+            )}
+            {isInProgress && (
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                In Progress
+              </span>
+            )}
+            {isTerminated && (
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
+                Terminated
+              </span>
+            )}
           </div>
-
-          <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-gray-500 mb-3">
-            <span className="flex items-center gap-1.5">
-              <Calendar className="w-4 h-4 text-gray-400" />
-              {startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-gray-400" />
-              {test.duration} min
-            </span>
-            <span className="flex items-center gap-1.5">
-              <BookOpen className="w-4 h-4 text-gray-400" />
-              {test.totalQuestions} Qs
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Target className="w-4 h-4 text-gray-400" />
-              {test.totalMarks} marks
-            </span>
-          </div>
-
-          {/* Countdown */}
-          {countdownLabel && (
-            <div className={`flex items-center gap-2 text-sm font-semibold ${
-              canStart ? 'text-accent-700' : 'text-amber-700'
-            }`}>
-              <Timer className="w-4 h-4" />
-              <span className="font-mono tracking-wide">{countdownLabel}</span>
-            </div>
+          {test.branch && (
+            <p className="text-sm text-gray-500 mb-1">{test.branch}</p>
           )}
-          {isEnded && !isCompleted && (
-            <p className="text-sm text-red-500 font-medium">This assessment is no longer available.</p>
+          {test.description && (
+            <p className="text-sm text-gray-400 line-clamp-2">{test.description}</p>
           )}
         </div>
 
-        <div className="flex-shrink-0">
-          {isCompleted ? (
-            <span className="flex items-center gap-1.5 text-sm text-accent-600 font-semibold">
-              <CheckCircle2 className="w-4 h-4" /> Completed
-            </span>
-          ) : isInProgress ? (
-            <button
-              onClick={() => onResume(test._id)}
-              className="btn bg-amber-500 text-white hover:bg-amber-600 shadow-sm"
-            >
-              <PlayCircle className="w-4 h-4" /> Resume
-            </button>
-          ) : isTerminated ? (
-            <span className="flex items-center gap-1.5 text-sm text-red-600 font-semibold">
-              <AlertTriangle className="w-4 h-4" /> Terminated
-            </span>
-          ) : (
-            <button
-              onClick={() => onStart(test._id)}
-              disabled={!canStart || startingTest === test._id}
-              className={`btn shadow-sm ${
-                canStart
-                  ? 'btn-primary'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
-              }`}
-            >
-              {startingTest === test._id ? (
-                <span className="flex items-center gap-2"><span className="loading-spinner" /> Starting...</span>
-              ) : (
-                <span className="flex items-center gap-1"><PlayCircle className="w-4 h-4" /> Start Exam</span>
-              )}
-            </button>
-          )}
+        {/* Center: Duration, Questions, Marks */}
+        <div className="flex items-center gap-6 px-5 md:px-6 py-4 md:py-6 border-t md:border-t-0 md:border-l border-gray-100 bg-gray-50/50 md:w-56 flex-shrink-0">
+          <div className="flex flex-col items-center gap-1">
+            <Clock className="w-4 h-4 text-gray-400" />
+            <span className="text-sm font-bold text-gray-900">{test.duration}m</span>
+            <span className="text-[11px] text-gray-400">Duration</span>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <BookOpen className="w-4 h-4 text-gray-400" />
+            <span className="text-sm font-bold text-gray-900">{test.totalQuestions}</span>
+            <span className="text-[11px] text-gray-400">Questions</span>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <Target className="w-4 h-4 text-gray-400" />
+            <span className="text-sm font-bold text-gray-900">{test.totalMarks}</span>
+            <span className="text-[11px] text-gray-400">Marks</span>
+          </div>
+        </div>
+
+        {/* Right: Countdown, Dates, Action */}
+        <div className="flex flex-col items-stretch justify-between p-5 md:p-6 md:w-64 flex-shrink-0 gap-4">
+          {/* Countdown */}
+          <div className="space-y-2">
+            {countdownLabel && (
+              <div className={`flex items-center gap-2 text-sm font-bold font-mono ${
+                isActiveWindow ? 'text-green-700' : 'text-blue-700'
+              }`}>
+                <Timer className="w-4 h-4 flex-shrink-0" />
+                <span className="tracking-wide">{countdownLabel}</span>
+              </div>
+            )}
+            {!isDbActive && (
+              <p className="text-sm text-gray-500 font-medium">Test unavailable — admin has deactivated it.</p>
+            )}
+            {availabilityStatus === 'Expired' && !isCompleted && (
+              <p className="text-sm text-red-500 font-medium">This assessment has expired.</p>
+            )}
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <Calendar className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+              <span>{formatDate(startDate)} — {formatDate(endDate)}</span>
+            </div>
+            <div className="text-xs text-gray-400">
+              {formatTime(startDate)} — {formatTime(endDate)}
+            </div>
+          </div>
+
+          {/* Action Button */}
+          <div className="flex-shrink-0">
+            {isCompleted ? (
+              <button className="w-full btn bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 text-sm font-semibold">
+                <CheckCircle2 className="w-4 h-4" /> Completed
+              </button>
+            ) : isInProgress ? (
+              <button
+                onClick={() => onResume(test._id)}
+                className="w-full btn bg-amber-500 text-white hover:bg-amber-600 shadow-sm text-sm font-semibold"
+              >
+                <PlayCircle className="w-4 h-4" /> Resume Exam
+              </button>
+            ) : isTerminated ? (
+              <button className="w-full btn bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 text-sm font-semibold cursor-not-allowed" disabled>
+                <AlertTriangle className="w-4 h-4" /> Terminated
+              </button>
+            ) : !isDbActive ? (
+              <button className="w-full btn bg-gray-50 text-gray-400 border border-gray-200 text-sm font-semibold cursor-not-allowed" disabled>
+                Inactive
+              </button>
+            ) : (
+              <button
+                onClick={() => onStart(test._id)}
+                disabled={!canStart || startingTest === test._id}
+                className={`w-full btn text-sm font-semibold shadow-sm ${
+                  canStart
+                    ? 'btn-primary'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                }`}
+              >
+                {startingTest === test._id ? (
+                  <span className="flex items-center justify-center gap-2"><span className="loading-spinner" /> Starting...</span>
+                ) : (
+                  <span className="flex items-center justify-center gap-1"><PlayCircle className="w-4 h-4" /> Start Exam</span>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
