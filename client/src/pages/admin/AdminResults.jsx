@@ -78,15 +78,26 @@ export default function AdminResults() {
         return;
       }
 
-      const contentDisposition = response.headers?.['content-disposition'] || '';
-      let filename = 'results.xlsx';
-      const filenameMatch = contentDisposition.match(/filename="?([^";\n]+)"?/);
-      if (filenameMatch) filename = filenameMatch[1];
+      const disposition = response.headers?.['content-disposition'];
+      console.log('Content-Disposition:', disposition);
 
-      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      let filename;
+      const match = disposition?.match(/filename="?([^"]+)"?/);
+      if (match?.[1]) {
+        filename = match[1];
+      } else {
+        const title = selectedTestInfo?.test.title || '';
+        const safeTitle = title.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
+        const today = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
+        filename = `${safeTitle || 'Results'}_Results_${today}.xlsx`;
+      }
+      console.log('Downloaded filename:', filename);
+
+      const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', filename);
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       link.remove();
