@@ -122,6 +122,7 @@ const resultService = {
   async exportResults({ search, testId, isPassed, isPublished }) {
     try {
       console.log('[EXCEL EXPORT] [1] Request received:', { search, testId, isPassed, isPublished });
+      const tStart = Date.now();
       const query = {};
 
       if (isPublished !== undefined) {
@@ -145,7 +146,8 @@ const resultService = {
           select: 'name email hallTicket collegeName branch',
         })
         .populate('testId', 'title totalMarks passingMarks branch')
-        .select('-__v');
+        .select('-__v')
+        .lean();
 
       console.log('[EXCEL EXPORT] [4] Results fetched from DB:', Array.isArray(results) ? results.length : 'NOT AN ARRAY');
 
@@ -166,132 +168,93 @@ const resultService = {
       }
 
       console.log('[EXCEL EXPORT] [7] Building export rows for', results.length, 'results');
+
+      const attemptIds = results
+        .map((r) => r.examAttemptId)
+        .filter((id) => id);
+
+      const tDb = Date.now();
+      const [attempts, violationRows] = await Promise.all([
+        ExamAttempt.find({ _id: { $in: attemptIds } })
+          .select('status terminatedReason startTime endTime')
+          .lean(),
+        SecurityLog.aggregate([
+          { $match: { examAttemptId: { $in: attemptIds } } },
+          { $group: { _id: '$examAttemptId', count: { $sum: 1 } } },
+        ]),
+      ]);
+      console.log('[EXCEL EXPORT] [8] Batch queries done in', Date.now() - tDb, 'ms (2 queries via Promise.all, no N+1)');
+
+      const attemptMap = new Map(attempts.map((a) => [a._id.toString(), a]));
+      const violationMap = new Map(violationRows.map((v) => [v._id.toString(), v.count]));
+
+      const now = Date.now();
       const exportData = [];
       for (const result of results) {
-        console.log('[EXCEL EXPORT] [8] Processing result:', {
-          resultId: String(result._id),
-          examAttemptId: result.examAttemptId ? String(result.examAttemptId) : 'MISSING',
-          studentId: result.studentId ? (result.studentId._id ? String(result.studentId._id) : 'populated-obj') : 'MISSING',
-          obtainedMarks: result.obtainedMarks,
-          totalMarks: result.totalMarks,
-          mcqScore: result.mcqScore,
-          codingScore: result.codingScore,
-          percentage: result.percentage,
-          isPassed: result.isPassed,
-          isPublished: result.isPublished,
-        });
-
-        const attempt = await ExamAttempt.findById(result.examAttemptId).select(
-          'status terminatedReason startTime endTime'
-        );
-        console.log('[EXCEL EXPORT] [9] Attempt found:', attempt ? { id: String(attempt._id), status: attempt.status, hasStartTime: !!attempt.startTime, hasEndTime: !!attempt.endTime } : 'null');
-
-        const violationCount = await SecurityLog.countDocuments({
-          examAttemptId: result.examAttemptId,
-        });
-        console.log('[EXCEL EXPORT] [10] Violation count:', violationCount);
+        const attempt = result.examAttemptId ? attemptMap.get(result.examAttemptId.toString()) : null;
+        const violationCount = result.examAttemptId ? (violationMap.get(result.examAttemptId.toString()) || 0) : 0;
 
         let timeTaken = null;
-        if (attempt) {
-          const start = attempt.startTime ? new Date(attempt.startTime).getTime() : null;
-          const end = attempt.endTime ? new Date(attempt.endTime).getTime() : Date.now();
-          if (start) {
-            timeTaken = Math.round((end - start) / 1000);
-          }
+        if (attempt && attempt.startTime) {
+          const start = new Date(attempt.startTime).getTime();
+          const end = attempt.endTime ? new Date(attempt.endTime).getTime() : now;
+          timeTaken = Math.round((end - start) / 1000);
         }
-        console.log('[EXCEL EXPORT] [11] Time taken (s):', timeTaken);
 
         exportData.push({
-          'Student Name': result.studentId?.name || '',
-          'Hall Ticket': result.studentId?.hallTicket || '',
-          College: result.studentId?.collegeName || '',
-          Branch: result.studentId?.branch || '',
-          Test: result.testId?.title || '',
-          Score: `${result.obtainedMarks}/${result.totalMarks}`,
-          'MCQ Score': result.mcqScore || 0,
-          'Coding Score': result.codingScore || 0,
-          Percentage: result.percentage / 100,
-          Result: result.isPassed ? 'Pass' : 'Fail',
-          'Attempt Status': (attempt?.status || '').replace(/_/g, ' '),
-          'Violation Count': violationCount,
-          'Time Taken (seconds)': timeTaken !== null ? timeTaken : '',
-          Published: result.isPublished ? 'Yes' : 'No',
+          studentName: result.studentId?.name || '',
+          hallTicket: result.studentId?.hallTicket || '',
+          college: result.studentId?.collegeName || '',
+          branch: result.studentId?.branch || '',
+          test: result.testId?.title || '',
+          score: `${result.obtainedMarks}/${result.totalMarks}`,
+          mcqScore: result.mcqScore || 0,
+          codingScore: result.codingScore || 0,
+          percentage: result.percentage / 100,
+          result: result.isPassed ? 'Pass' : 'Fail',
+          attemptStatus: (attempt?.status || '').replace(/_/g, ' '),
+          violationCount,
+          timeTaken: timeTaken !== null ? timeTaken : '',
+          published: result.isPublished ? 'Yes' : 'No',
         });
       }
-      console.log('[EXCEL EXPORT] [12] exportData built:', exportData.length, 'rows');
+      console.log('[EXCEL EXPORT] [9] exportData built in', Date.now() - now, 'ms:', exportData.length, 'rows');
 
-    const headers = [
-      'Student Name', 'Hall Ticket', 'College', 'Branch', 'Test',
-      'Score', 'MCQ Score', 'Coding Score', 'Percentage', 'Result',
-      'Attempt Status', 'Violation Count', 'Time Taken (seconds)', 'Published',
-    ];
+      const columns = [
+        { header: 'Student Name', key: 'studentName', width: 22 },
+        { header: 'Hall Ticket', key: 'hallTicket', width: 16 },
+        { header: 'College', key: 'college', width: 20 },
+        { header: 'Branch', key: 'branch', width: 10 },
+        { header: 'Test', key: 'test', width: 20 },
+        { header: 'Score', key: 'score', width: 10 },
+        { header: 'MCQ Score', key: 'mcqScore', width: 10 },
+        { header: 'Coding Score', key: 'codingScore', width: 12 },
+        { header: 'Percentage', key: 'percentage', width: 11 },
+        { header: 'Result', key: 'result', width: 9 },
+        { header: 'Attempt Status', key: 'attemptStatus', width: 15 },
+        { header: 'Violation Count', key: 'violationCount', width: 12 },
+        { header: 'Time Taken (seconds)', key: 'timeTaken', width: 20 },
+        { header: 'Published', key: 'published', width: 10 },
+      ];
 
-    const numericCols = ['MCQ Score', 'Coding Score', 'Percentage', 'Violation Count', 'Time Taken (seconds)'];
-    const centerCols = ['MCQ Score', 'Coding Score', 'Percentage', 'Result', 'Violation Count', 'Time Taken (seconds)', 'Published'];
+      const tWb = Date.now();
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Results');
+      sheet.views = [{ state: 'frozen', ySplit: 1 }];
+      sheet.columns = columns;
+      sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+      sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+      sheet.getRow(1).height = 22;
+      sheet.getColumn('percentage').numFmt = '0.00%';
+      sheet.addRows(exportData);
+      console.log('[EXCEL EXPORT] [10] Workbook created in', Date.now() - tWb, 'ms, sheet.rowCount:', sheet.rowCount);
 
-    const workbook = new ExcelJS.Workbook();
-    console.log('[EXCEL EXPORT] [13] Workbook created via new ExcelJS.Workbook():', workbook ? 'OK' : 'FAIL');
-    workbook.creator = 'CoreSoft';
-    workbook.created = new Date();
-
-    const sheet = workbook.addWorksheet('Results');
-    console.log('[EXCEL EXPORT] [14] Worksheet created:', sheet ? sheet.name : 'FAIL');
-
-    sheet.views = [{ state: 'frozen', ySplit: 1 }];
-
-    const headerRow = sheet.addRow(headers);
-    console.log('[EXCEL EXPORT] [15] Header row added:', headerRow ? `${headerRow.values.length} columns` : 'FAIL');
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
-    headerRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF1E3A5F' },
-    };
-    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
-    headerRow.height = 22;
-
-    for (const row of exportData) {
-      sheet.addRow(headers.map((h) => row[h]));
-    }
-    console.log('[EXCEL EXPORT] [16] Data rows added, sheet.rowCount:', sheet.rowCount);
-
-    for (let i = 1; i <= sheet.rowCount; i++) {
-      for (let j = 1; j <= headers.length; j++) {
-        const cell = sheet.getCell(i, j);
-        cell.border = {
-          top: { style: 'thin', color: { argb: 'FFD0D0D0' } },
-          left: { style: 'thin', color: { argb: 'FFD0D0D0' } },
-          bottom: { style: 'thin', color: { argb: 'FFD0D0D0' } },
-          right: { style: 'thin', color: { argb: 'FFD0D0D0' } },
-        };
-        if (i > 1) {
-          cell.alignment = { vertical: 'middle' };
-          if (centerCols.includes(headers[j - 1])) {
-            cell.alignment = { vertical: 'middle', horizontal: 'center' };
-          }
-        }
-      }
-    }
-    console.log('[EXCEL EXPORT] [17] Borders/alignment applied');
-
-    for (let j = 1; j <= headers.length; j++) {
-      const col = sheet.getColumn(j);
-      let maxLen = headers[j - 1].length;
-      for (let i = 2; i <= sheet.rowCount; i++) {
-        const val = String(sheet.getCell(i, j).value ?? '');
-        if (val.length > maxLen) maxLen = val.length;
-      }
-      col.width = Math.min(maxLen + 4, 40);
-    }
-    console.log('[EXCEL EXPORT] [18] Column widths set');
-
-    const pctCol = sheet.getColumn('Percentage');
-    pctCol.numFmt = '0.00%';
-
-    console.log('[EXCEL EXPORT] [19] Calling workbook.xlsx.writeBuffer()...');
-    const buffer = await workbook.xlsx.writeBuffer();
-    console.log('[EXCEL EXPORT] [20] writeBuffer resolved. Is Buffer:', Buffer.isBuffer(buffer), '| length:', buffer.length, '| type:', typeof buffer);
-    return { buffer: Buffer.from(buffer), count: results.length };
+      console.log('[EXCEL EXPORT] [11] Calling workbook.xlsx.writeBuffer()...');
+      const tBuf = Date.now();
+      const buffer = await workbook.xlsx.writeBuffer({ useSharedStrings: false });
+      console.log('[EXCEL EXPORT] [12] writeBuffer resolved in', Date.now() - tBuf, 'ms | bytes:', buffer.length);
+      console.log('[EXCEL EXPORT] [13] TOTAL export time:', Date.now() - tStart, 'ms');
+      return { buffer: Buffer.from(buffer), count: results.length };
     } catch (error) {
       console.error('===== EXCEL EXPORT ERROR =====');
       console.error(error);
