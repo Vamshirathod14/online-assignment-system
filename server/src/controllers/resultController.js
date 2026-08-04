@@ -1,5 +1,6 @@
 const resultService = require('../services/resultService');
 const sendResponse = require('../utils/sendResponse');
+const { Test } = require('../models');
 
 exports.getMyResults = async (req, res, next) => {
   try {
@@ -75,9 +76,26 @@ exports.unpublishAllResults = async (req, res, next) => {
 
 exports.exportResults = async (req, res, next) => {
   try {
-    const buffer = await resultService.exportResults(req.query);
+    const { buffer, count } = await resultService.exportResults(req.query);
 
-    res.setHeader('Content-Disposition', 'attachment; filename=results.xlsx');
+    if (!buffer || count === 0) {
+      return sendResponse(res, 200, null, 'No results available to export');
+    }
+
+    let testTitle = 'Results';
+    if (req.query.testId) {
+      const test = await Test.findById(req.query.testId).select('title');
+      if (test?.title) testTitle = test.title;
+    }
+
+    const sanitized = testTitle.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+    const today = new Date();
+    const dd = String(today.getDate()).padStart(2, '0');
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const yyyy = today.getFullYear();
+    const filename = `${sanitized}_Results_${dd}-${mm}-${yyyy}.xlsx`;
+
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.send(buffer);
   } catch (error) {

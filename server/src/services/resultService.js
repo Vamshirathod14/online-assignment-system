@@ -1,6 +1,7 @@
 const { Result, ExamAttempt, SecurityLog, Test } = require('../models');
 const ApiError = require('../utils/ApiError');
 const XLSX = require('xlsx');
+const ExcelJS = require('exceljs');
 
 const resultService = {
   async getPublishedResultsByStudent(studentId) {
@@ -151,14 +152,27 @@ const resultService = {
       );
     }
 
+    if (results.length === 0) {
+      return { buffer: null, count: 0 };
+    }
+
     const exportData = [];
     for (const result of results) {
       const attempt = await ExamAttempt.findById(result.examAttemptId).select(
-        'status terminatedReason'
+        'status terminatedReason startTime endTime'
       );
       const violationCount = await SecurityLog.countDocuments({
         examAttemptId: result.examAttemptId,
       });
+
+      let timeTaken = null;
+      if (attempt) {
+        const start = attempt.startTime ? new Date(attempt.startTime).getTime() : null;
+        const end = attempt.endTime ? new Date(attempt.endTime).getTime() : Date.now();
+        if (start) {
+          timeTaken = Math.round((end - start) / 1000);
+        }
+      }
 
       exportData.push({
         'Student Name': result.studentId?.name || '',
@@ -169,20 +183,79 @@ const resultService = {
         Score: `${result.obtainedMarks}/${result.totalMarks}`,
         'MCQ Score': result.mcqScore || 0,
         'Coding Score': result.codingScore || 0,
-        Percentage: `${result.percentage}%`,
+        Percentage: result.percentage / 100,
         Result: result.isPassed ? 'Pass' : 'Fail',
         'Attempt Status': (attempt?.status || '').replace(/_/g, ' '),
         'Violation Count': violationCount,
+        'Time Taken (seconds)': timeTaken !== null ? timeTaken : '',
         Published: result.isPublished ? 'Yes' : 'No',
       });
     }
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Results');
+    const headers = [
+      'Student Name', 'Hall Ticket', 'College', 'Branch', 'Test',
+      'Score', 'MCQ Score', 'Coding Score', 'Percentage', 'Result',
+      'Attempt Status', 'Violation Count', 'Time Taken (seconds)', 'Published',
+    ];
 
-    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-    return buffer;
+    const numericCols = ['MCQ Score', 'Coding Score', 'Percentage', 'Violation Count', 'Time Taken (seconds)'];
+    const centerCols = ['MCQ Score', 'Coding Score', 'Percentage', 'Result', 'Violation Count', 'Time Taken (seconds)', 'Published'];
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'CoreSoft';
+    workbook.created = new Date();
+
+    const sheet = workbook.addWorksheet('Results');
+
+    sheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+    const headerRow = sheet.addRow(headers);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF1E3A5F' },
+    };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    headerRow.height = 22;
+
+    for (const row of exportData) {
+      sheet.addRow(headers.map((h) => row[h]));
+    }
+
+    for (let i = 1; i <= sheet.rowCount; i++) {
+      for (let j = 1; j <= headers.length; j++) {
+        const cell = sheet.getCell(i, j);
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFD0D0D0' } },
+          left: { style: 'thin', color: { argb: 'FFD0D0D0' } },
+          bottom: { style: 'thin', color: { argb: 'FFD0D0D0' } },
+          right: { style: 'thin', color: { argb: 'FFD0D0D0' } },
+        };
+        if (i > 1) {
+          cell.alignment = { vertical: 'middle' };
+          if (centerCols.includes(headers[j - 1])) {
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          }
+        }
+      }
+    }
+
+    for (let j = 1; j <= headers.length; j++) {
+      const col = sheet.getColumn(j);
+      let maxLen = headers[j - 1].length;
+      for (let i = 2; i <= sheet.rowCount; i++) {
+        const val = String(sheet.getCell(i, j).value ?? '');
+        if (val.length > maxLen) maxLen = val.length;
+      }
+      col.width = Math.min(maxLen + 4, 40);
+    }
+
+    const pctCol = sheet.getColumn('Percentage');
+    pctCol.numFmt = '0.00%';
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return { buffer: Buffer.from(buffer), count: results.length };
   },
 
   async getTestWiseResults() {

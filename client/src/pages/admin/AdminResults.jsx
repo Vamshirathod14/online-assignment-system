@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import {
   Search, Download, Eye, EyeOff, CheckCircle2, X, AlertTriangle,
-  RefreshCw, BarChart3, ChevronLeft, Code
+  RefreshCw, BarChart3, ChevronLeft, Code, Loader2
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 
@@ -17,6 +17,7 @@ export default function AdminResults() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const fetchTestStats = useCallback(async () => {
     setLoading(true);
@@ -58,23 +59,43 @@ export default function AdminResults() {
 
   const handleExport = async () => {
     if (!selectedTest) return;
+    if (results.length === 0) {
+      toast.warn('No results available to export.');
+      return;
+    }
+    setExporting(true);
     try {
       const params = new URLSearchParams();
       params.append('testId', selectedTest);
       if (search) params.append('search', search);
       if (statusFilter) params.append('isPassed', statusFilter);
-      const response = await api.get(`/results/export-csv?${params.toString()}`, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const response = await api.get(`/results/export?${params.toString()}`, { responseType: 'blob' });
+
+      if (response.data.type === 'application/json') {
+        const text = await response.data.text();
+        const json = JSON.parse(text);
+        toast.warn(json.message || 'No results available to export.');
+        return;
+      }
+
+      const contentDisposition = response.headers?.['content-disposition'] || '';
+      let filename = 'results.xlsx';
+      const filenameMatch = contentDisposition.match(/filename="?([^";\n]+)"?/);
+      if (filenameMatch) filename = filenameMatch[1];
+
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', 'results.csv');
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      toast.success('Results exported');
+      toast.success('Results exported successfully');
     } catch {
       toast.error('Failed to export results');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -235,8 +256,12 @@ export default function AdminResults() {
           <button onClick={() => navigate('/admin/coding-submissions')} className="btn-secondary text-sm">
             <Code className="w-4 h-4" /> Submissions
           </button>
-          <button onClick={handleExport} className="btn-secondary text-sm">
-            <Download className="w-4 h-4" /> Export CSV
+          <button onClick={handleExport} disabled={exporting} className="btn-secondary text-sm">
+            {exporting ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Exporting...</>
+            ) : (
+              <><Download className="w-4 h-4" /> Export Excel</>
+            )}
           </button>
         </div>
       </div>
