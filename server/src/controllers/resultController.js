@@ -89,19 +89,19 @@ exports.exportResults = async (req, res, next) => {
     let testTitle = 'Results';
     if (req.query.testId) {
       console.log('[EXCEL EXPORT] [D] Looking up test by testId:', req.query.testId);
-      const test = await Test.findById(req.query.testId).select('title');
+      const test = await Test.findById(req.query.testId).select('title').lean();
       console.log('[EXCEL EXPORT] [E] Test lookup result:', test ? { id: String(test._id), title: test.title } : 'null');
       if (test?.title) testTitle = test.title;
     } else {
       console.log('[EXCEL EXPORT] [D] No testId in query — using default title');
     }
 
-    const sanitized = testTitle.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-    const today = new Date();
-    const dd = String(today.getDate()).padStart(2, '0');
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const yyyy = today.getFullYear();
-    const filename = `${sanitized}_Results_${dd}-${mm}-${yyyy}.xlsx`;
+    const safeTitle = testTitle
+      .trim()
+      .replace(/\s+/g, '_')
+      .replace(/[^a-zA-Z0-9_-]/g, '');
+    const today = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
+    const filename = `${safeTitle}_Results_${today}.xlsx`;
     console.log('[EXCEL EXPORT] [F] Generated filename:', filename);
 
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
