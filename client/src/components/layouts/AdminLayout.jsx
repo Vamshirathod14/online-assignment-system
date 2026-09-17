@@ -12,12 +12,14 @@ import {
   X,
   Shield,
   Building2,
+  Database,
 } from 'lucide-react';
 
 const navItems = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/admin/students', label: 'Students', icon: Users },
   { to: '/admin/tests', label: 'Tests', icon: ClipboardList },
+  { to: '/admin/question-banks', label: 'Question Banks', icon: Database },
   { to: '/admin/questions', label: 'Questions', icon: HelpCircle },
   { to: '/admin/results', label: 'Results', icon: BarChart3 },
   { to: '/admin/colleges', label: 'Colleges', icon: Building2 },

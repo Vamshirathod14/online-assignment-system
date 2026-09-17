@@ -1,4 +1,4 @@
-const { Test, Question, ExamAttempt, Result, Student } = require('../models');
+const { Test, Question, ExamAttempt, Result, Student, QuestionBank } = require('../models');
 const ApiError = require('../utils/ApiError');
 
 const testService = {
@@ -65,7 +65,7 @@ const testService = {
     return test;
   },
 
-  async assignQuestionsManual(testId, questionIds) {
+  async assignQuestionsManual(testId, questionIds, questionBank) {
     const test = await Test.findById(testId);
     if (!test) {
       throw ApiError.notFound('Test not found');
@@ -74,22 +74,45 @@ const testService = {
     if (questions.length !== questionIds.length) {
       throw ApiError.badRequest('Some question IDs are invalid');
     }
+    if (questionBank) {
+      const bank = await QuestionBank.findById(questionBank);
+      if (!bank) {
+        throw ApiError.badRequest('Selected question bank does not exist');
+      }
+      const inBank = questions.filter((q) => String(q.questionBank) === String(bank._id));
+      if (inBank.length !== questionIds.length) {
+        throw ApiError.badRequest(`All questions must belong to the selected question bank (${questionIds.length - inBank.length} question(s) from another bank)`);
+      }
+    }
     test.assignedQuestions = questionIds;
     await test.save();
     return await Test.findById(testId).populate('assignedQuestions');
   },
 
-  async assignQuestionsRandom(testId, count) {
+  async assignQuestionsRandom(testId, count, questionBank) {
     const test = await Test.findById(testId);
     if (!test) {
       throw ApiError.notFound('Test not found');
     }
     const numQuestions = count || test.totalQuestions;
-    const questions = await Question.aggregate([
-      { $sample: { size: numQuestions } },
-    ]);
+    const match = {};
+    if (questionBank) {
+      if (questionBank === 'unassigned') {
+        match.questionBank = null;
+      } else {
+        const bank = await QuestionBank.findById(questionBank);
+        if (!bank) {
+          throw ApiError.badRequest('Selected question bank does not exist');
+        }
+        match.questionBank = bank._id;
+      }
+    }
+    const pipeline = [];
+    if (Object.keys(match).length > 0) pipeline.push({ $match: match });
+    pipeline.push({ $sample: { size: numQuestions } });
+    const questions = await Question.aggregate(pipeline);
     if (questions.length < numQuestions) {
-      throw ApiError.badRequest(`Only ${questions.length} questions available in the bank`);
+      throw ApiError.badRequest(`Only ${questions.length} questions available in the selected question bank`);
     }
     test.assignedQuestions = questions.map((q) => q._id);
     await test.save();

@@ -60,6 +60,7 @@ app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/students', require('./routes/studentRoutes'));
 app.use('/api/tests', require('./routes/testRoutes'));
 app.use('/api/questions', require('./routes/questionRoutes'));
+app.use('/api/question-banks', require('./routes/questionBankRoutes'));
 app.use('/api/exam', require('./routes/examRoutes'));
 app.use('/api/security', require('./routes/securityRoutes'));
 app.use('/api/results', require('./routes/resultRoutes'));

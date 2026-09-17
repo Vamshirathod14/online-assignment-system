@@ -41,6 +41,11 @@ const questionSchema = new mongoose.Schema(
       required: [true, 'Subject is required'],
       trim: true,
     },
+    questionBank: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'QuestionBank',
+      default: null,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Admin',

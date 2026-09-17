@@ -17,6 +17,7 @@ const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminStudents = lazy(() => import('./pages/admin/AdminStudents'));
 const AdminTests = lazy(() => import('./pages/admin/AdminTests'));
+const AdminQuestionBanks = lazy(() => import('./pages/admin/AdminQuestionBanks'));
 const AdminQuestions = lazy(() => import('./pages/admin/AdminQuestions'));
 const AdminResults = lazy(() => import('./pages/admin/AdminResults'));
 const AdminTestDetails = lazy(() => import('./pages/admin/AdminTestDetails'));
@@ -120,6 +121,16 @@ function App() {
             <ProtectedRoute allowedRole="admin">
               <AdminLayout>
                 <AdminTests />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/question-banks"
+          element={
+            <ProtectedRoute allowedRole="admin">
+              <AdminLayout>
+                <AdminQuestionBanks />
               </AdminLayout>
             </ProtectedRoute>
           }

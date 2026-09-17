@@ -1,13 +1,19 @@
-const { Question } = require('../models');
+const { Question, QuestionBank } = require('../models');
 const ApiError = require('../utils/ApiError');
 const XLSX = require('xlsx');
 
 const questionService = {
   async create(data) {
+    if (data.questionBank) {
+      const bank = await QuestionBank.findById(data.questionBank);
+      if (!bank) {
+        throw ApiError.badRequest('Selected question bank does not exist');
+      }
+    }
     return await Question.create(data);
   },
 
-  async getAll({ search, subject, difficulty, questionType, marks, sortBy }) {
+  async getAll({ search, subject, difficulty, questionType, marks, sortBy, questionBank }) {
     let query = {};
     if (search) {
       query.$or = [
@@ -19,12 +25,15 @@ const questionService = {
     if (difficulty) query.difficulty = difficulty;
     if (questionType) query.questionType = questionType;
     if (marks) query.marks = Number(marks);
+    if (questionBank) {
+      query.questionBank = questionBank === 'unassigned' ? null : questionBank;
+    }
 
     let sort = { createdAt: -1 };
     if (sortBy === 'oldest') sort = { createdAt: 1 };
     else if (sortBy === 'difficulty') sort = { difficulty: 1 };
 
-    return await Question.find(query).select('-__v').sort(sort);
+    return await Question.find(query).select('-__v').populate('questionBank', 'name').sort(sort);
   },
 
   async getByTestId(testId) {
@@ -55,14 +64,56 @@ const questionService = {
     return question;
   },
 
-  async bulkUpload(fileBuffer, createdBy) {
+  async bulkUpload(fileBuffer, createdBy, questionBank) {
+    let selectedBankName = null;
+    if (questionBank) {
+      const bank = await QuestionBank.findById(questionBank);
+      if (!bank) {
+        throw ApiError.badRequest('Selected question bank does not exist');
+      }
+      selectedBankName = bank.name;
+    }
+
+    const pick = (row, keys) => {
+      for (const key of keys) {
+        if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
+          return row[key];
+        }
+      }
+      return undefined;
+    };
+
+    const normalizeDifficulty = (value) => {
+      const map = {
+        basic: 'easy',
+        easy: 'easy',
+        medium: 'medium',
+        intermediate: 'medium',
+        hard: 'hard',
+        advanced: 'hard',
+      };
+      return map[String(value || '').toLowerCase().trim()];
+    };
+
     const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
+    const bankCache = new Map();
+    const resolveRowBank = async (name) => {
+      const key = String(name || '').trim().toLowerCase();
+      if (!key) return questionBank;
+      if (bankCache.has(key)) return bankCache.get(key);
+      let bank = await QuestionBank.findOne({ name: { $regex: `^${key}$`, $options: 'i' } });
+      if (!bank) {
+        bank = await QuestionBank.create({ name: String(name).trim(), createdBy });
+      }
+      bankCache.set(key, bank._id);
+      return bank._id;
+    };
+
     const results = { inserted: 0, skipped: 0, failed: 0, errors: [] };
 
-    const validDifficulties = ['easy', 'medium', 'hard'];
     const validOptions = ['A', 'B', 'C', 'D'];
     const validLanguages = ['python', 'java', 'c', 'cpp', 'javascript'];
 
@@ -70,23 +121,39 @@ const questionService = {
       const row = rows[i];
       const rowNum = i + 1;
 
-      const qType = (row.Type || 'mcq').toLowerCase().trim();
+      const questionText = pick(row, ['Question', 'Question Text', 'QuestionText']);
+      let subject = pick(row, ['Subject', 'Topic', 'Category']);
+      const difficultyRaw = normalizeDifficulty(pick(row, ['Difficulty', 'Level']));
+      const marks = Number(pick(row, ['Marks', 'Mark'])) || 1;
+      const explanation = pick(row, ['Explanation', 'Explain']) ? String(pick(row, ['Explanation', 'Explain'])).trim() : '';
 
-      if (!row.Question || !row.Subject) {
+      const qType = (pick(row, ['Type', 'Question Type', 'QType']) || 'mcq').toLowerCase().trim();
+      const rowBank = await resolveRowBank(row.QuestionBank);
+      const bankName = rowBank ? (row.QuestionBank ? String(row.QuestionBank).trim() : selectedBankName) : null;
+      if (!subject) {
+        subject = bankName || null;
+      }
+
+      if (!questionText) {
         results.skipped++;
-        results.errors.push(`Row ${rowNum}: Missing Question or Subject`);
+        results.errors.push(`Row ${rowNum}: Missing Question text`);
+        continue;
+      }
+
+      if (!subject) {
+        results.skipped++;
+        results.errors.push(`Row ${rowNum}: Missing Subject (no Subject column, and no target question bank selected/column provided)`);
+        continue;
+      }
+
+      if (!difficultyRaw) {
+        results.skipped++;
+        results.errors.push(`Row ${rowNum}: Invalid Difficulty "${pick(row, ['Difficulty', 'Level'])}". Must be easy, medium, hard (or Basic, Intermediate, Advanced)`);
         continue;
       }
 
       if (qType === 'coding') {
-        const difficulty = row.Difficulty ? String(row.Difficulty).trim().toLowerCase() : 'medium';
-        if (!validDifficulties.includes(difficulty)) {
-          results.skipped++;
-          results.errors.push(`Row ${rowNum}: Invalid Difficulty "${row.Difficulty}"`);
-          continue;
-        }
-
-        const langs = row.Languages ? String(row.Languages).split(',').map(l => l.trim().toLowerCase()).filter(l => validLanguages.includes(l)) : [];
+        const langs = pick(row, ['Languages']) ? String(pick(row, ['Languages'])).split(',').map(l => l.trim().toLowerCase()).filter(l => validLanguages.includes(l)) : [];
         if (langs.length === 0) {
           results.skipped++;
           results.errors.push(`Row ${rowNum}: No valid languages specified. Use: python, java, c, cpp, javascript`);
@@ -94,31 +161,38 @@ const questionService = {
         }
 
         const sampleTestCases = [];
-        if (row.SampleInput || row.SampleOutput) {
-          sampleTestCases.push({ input: String(row.SampleInput || ''), expectedOutput: String(row.SampleOutput || '') });
+        if (pick(row, ['SampleInput', 'Sample Input']) || pick(row, ['SampleOutput', 'Sample Output'])) {
+          sampleTestCases.push({
+            input: String(pick(row, ['SampleInput', 'Sample Input']) || ''),
+            expectedOutput: String(pick(row, ['SampleOutput', 'Sample Output']) || ''),
+          });
         }
 
         const hiddenTestCases = [];
-        if (row.HiddenInput || row.HiddenOutput) {
-          hiddenTestCases.push({ input: String(row.HiddenInput || ''), expectedOutput: String(row.HiddenOutput || '') });
+        if (pick(row, ['HiddenInput', 'Hidden Input']) || pick(row, ['HiddenOutput', 'Hidden Output'])) {
+          hiddenTestCases.push({
+            input: String(pick(row, ['HiddenInput', 'Hidden Input']) || ''),
+            expectedOutput: String(pick(row, ['HiddenOutput', 'Hidden Output']) || ''),
+          });
         }
 
         try {
           await Question.create({
-            questionText: String(row.Question).trim(),
+            questionText: String(questionText).trim(),
             questionType: 'coding',
-            starterCode: row.StarterCode ? String(row.StarterCode).trim() : '',
+            starterCode: pick(row, ['StarterCode', 'Starter Code']) ? String(pick(row, ['StarterCode', 'Starter Code'])).trim() : '',
             allowedLanguages: langs,
-            constraints: row.Constraints ? String(row.Constraints).trim() : '',
-            explanation: row.Explanation ? String(row.Explanation).trim() : '',
+            constraints: pick(row, ['Constraints']) ? String(pick(row, ['Constraints'])).trim() : '',
+            explanation,
             sampleTestCases,
             hiddenTestCases,
-            difficulty,
-            marks: Number(row.Marks) || 1,
-            subject: String(row.Subject).trim(),
-            timeLimit: Number(row.TimeLimit) || 5000,
-            memoryLimit: Number(row.MemoryLimit) || 256,
+            difficulty: difficultyRaw,
+            marks,
+            subject: String(subject).trim(),
+            timeLimit: Number(pick(row, ['TimeLimit', 'Time Limit'])) || 5000,
+            memoryLimit: Number(pick(row, ['MemoryLimit', 'Memory Limit'])) || 256,
             createdBy,
+            questionBank: rowBank,
           });
           results.inserted++;
         } catch (err) {
@@ -129,41 +203,41 @@ const questionService = {
       }
 
       // MCQ / other types
-      if (!row.OptionA || !row.OptionB || !row.OptionC || !row.OptionD || !row.CorrectAnswer) {
+      const optionA = pick(row, ['Option A', 'OptionA', 'Option A Text']);
+      const optionB = pick(row, ['Option B', 'OptionB', 'Option B Text']);
+      const optionC = pick(row, ['Option C', 'OptionC', 'Option C Text']);
+      const optionD = pick(row, ['Option D', 'OptionD', 'Option D Text']);
+      const correctAnswerRaw = pick(row, ['Correct Answer', 'CorrectAnswer', 'Correct Option', 'Answer']);
+
+      if (!optionA || !optionB || !optionC || !optionD || !correctAnswerRaw) {
         results.skipped++;
         results.errors.push(`Row ${rowNum}: Missing required MCQ fields`);
         continue;
       }
 
-      const correctAnswer = String(row.CorrectAnswer).trim().toUpperCase();
+      const correctAnswer = String(correctAnswerRaw).trim().toUpperCase();
       if (!validOptions.includes(correctAnswer)) {
         results.skipped++;
-        results.errors.push(`Row ${rowNum}: Invalid CorrectAnswer "${row.CorrectAnswer}". Must be A, B, C, or D`);
-        continue;
-      }
-
-      const difficulty = row.Difficulty ? String(row.Difficulty).trim().toLowerCase() : 'medium';
-      if (!validDifficulties.includes(difficulty)) {
-        results.skipped++;
-        results.errors.push(`Row ${rowNum}: Invalid Difficulty "${row.Difficulty}". Must be easy, medium, or hard`);
+        results.errors.push(`Row ${rowNum}: Invalid CorrectAnswer "${correctAnswerRaw}". Must be A, B, C, or D`);
         continue;
       }
 
       try {
         await Question.create({
-          questionText: String(row.Question).trim(),
+          questionText: String(questionText).trim(),
           questionType: qType,
           options: [
-            { label: 'A', text: String(row.OptionA).trim() },
-            { label: 'B', text: String(row.OptionB).trim() },
-            { label: 'C', text: String(row.OptionC).trim() },
-            { label: 'D', text: String(row.OptionD).trim() },
+            { label: 'A', text: String(optionA).trim() },
+            { label: 'B', text: String(optionB).trim() },
+            { label: 'C', text: String(optionC).trim() },
+            { label: 'D', text: String(optionD).trim() },
           ],
           correctOption: correctAnswer,
-          difficulty,
-          marks: Number(row.Marks) || 1,
-          subject: String(row.Subject).trim(),
+          difficulty: difficultyRaw,
+          marks,
+          subject: String(subject).trim(),
           createdBy,
+          questionBank: rowBank,
         });
         results.inserted++;
       } catch (err) {
@@ -175,8 +249,12 @@ const questionService = {
     return results;
   },
 
-  async getQuestionCount() {
-    return await Question.countDocuments();
+  async getQuestionCount(questionBank) {
+    let query = {};
+    if (questionBank) {
+      query.questionBank = questionBank === 'unassigned' ? null : questionBank;
+    }
+    return await Question.countDocuments(query);
   },
 
   async getSubjects() {
@@ -199,13 +277,16 @@ const questionService = {
     return await Question.create(obj);
   },
 
-  async exportQuestions({ subject, difficulty, questionType }) {
+  async exportQuestions({ subject, difficulty, questionType, questionBank }) {
     let query = {};
     if (subject) query.subject = subject;
     if (difficulty) query.difficulty = difficulty;
     if (questionType) query.questionType = questionType;
+    if (questionBank) {
+      query.questionBank = questionBank === 'unassigned' ? null : questionBank;
+    }
 
-    const questions = await Question.find(query).select('-__v -createdBy').sort({ createdAt: -1 });
+    const questions = await Question.find(query).select('-__v -createdBy').populate('questionBank', 'name').sort({ createdAt: -1 });
 
     const exportData = questions.map((q, i) => {
       const row = {
@@ -213,6 +294,7 @@ const questionService = {
         'Question': q.questionText,
         'Type': q.questionType,
         'Subject': q.subject,
+        'QuestionBank': q.questionBank?.name || '',
         'Difficulty': q.difficulty,
         'Marks': q.marks,
       };

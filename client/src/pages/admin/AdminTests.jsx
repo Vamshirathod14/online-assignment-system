@@ -52,9 +52,12 @@ export default function AdminTests() {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignTestId, setAssignTestId] = useState(null);
   const [assignCount, setAssignCount] = useState('');
+  const [assignBank, setAssignBank] = useState('');
+  const [banks, setBanks] = useState([]);
   const [selectedQuestions, setSelectedQuestions] = useState([]);
   const [assignMode, setAssignMode] = useState('random');
   const [questionSearch, setQuestionSearch] = useState('');
+  const [questionsLoading, setQuestionsLoading] = useState(false);
 
   const fetchTests = useCallback(async () => {
     setLoading(true);
@@ -70,16 +73,38 @@ export default function AdminTests() {
   }, [search]);
 
   const fetchQuestions = useCallback(async () => {
+    if (!assignBank) {
+      setQuestions([]);
+      setQuestionsLoading(false);
+      return;
+    }
+    setQuestionsLoading(true);
     try {
-      const params = questionSearch ? { search: questionSearch } : {};
+      const params = { questionBank: assignBank };
+      if (questionSearch) params.search = questionSearch;
       const { data } = await api.get('/questions', { params });
       setQuestions(data.data);
     } catch {
       // ignore
+    } finally {
+      setQuestionsLoading(false);
     }
-  }, [questionSearch]);
+  }, [questionSearch, assignBank]);
+
+  const fetchBanks = useCallback(async () => {
+    try {
+      const { data } = await api.get('/question-banks');
+      setBanks(data.data || []);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   useEffect(() => { fetchTests(); }, [fetchTests]);
+
+  useEffect(() => {
+    if (showAssignModal && assignBank) fetchQuestions();
+  }, [fetchQuestions, showAssignModal, assignBank]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -176,26 +201,35 @@ export default function AdminTests() {
     setAssignTestId(test._id);
     setAssignMode('random');
     setAssignCount('');
+    setAssignBank('');
     setSelectedQuestions([]);
     setQuestionSearch('');
     setShowAssignModal(true);
+    await fetchBanks();
     await fetchQuestions();
   };
 
   const handleAssign = async () => {
     try {
+      if (!assignBank) {
+        toast.error('Select a Question Bank first');
+        return;
+      }
       if (assignMode === 'random') {
         if (!assignCount || Number(assignCount) <= 0) {
           toast.error('Enter a valid number of questions');
           return;
         }
-        await api.put(`/tests/${assignTestId}/assign-random`, { count: Number(assignCount) || undefined });
+        await api.put(`/tests/${assignTestId}/assign-random`, {
+          count: Number(assignCount) || undefined,
+          questionBank: assignBank,
+        });
       } else {
         if (selectedQuestions.length === 0) {
           toast.error('Select at least one question');
           return;
         }
-        await api.put(`/tests/${assignTestId}/assign-manual`, { questionIds: selectedQuestions });
+        await api.put(`/tests/${assignTestId}/assign-manual`, { questionIds: selectedQuestions, questionBank: assignBank });
       }
       setShowAssignModal(false);
       fetchTests();
@@ -209,6 +243,8 @@ export default function AdminTests() {
       prev.includes(id) ? prev.filter((q) => q !== id) : [...prev, id]
     );
   };
+
+  const assignBankName = banks.find((b) => b._id === assignBank)?.name || '';
 
   return (
     <div className="animate-fade-in">
@@ -346,64 +382,99 @@ export default function AdminTests() {
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
-            <div className="flex gap-2 mb-5">
-              <button onClick={() => setAssignMode('random')}
-                className={`btn text-sm ${assignMode === 'random' ? 'btn-primary' : 'btn-secondary'}`}>
-                Random Selection
-              </button>
-              <button onClick={() => { setAssignMode('manual'); fetchQuestions(); }}
-                className={`btn text-sm ${assignMode === 'manual' ? 'btn-primary' : 'btn-secondary'}`}>
-                Manual Selection
-              </button>
+            <div className="mb-4">
+              <label className="label">Question Bank *</label>
+              <select
+                value={assignBank}
+                onChange={(e) => { setAssignBank(e.target.value); setSelectedQuestions([]); }}
+                className={`input-field ${!assignBank ? 'border-amber-300' : ''}`}
+              >
+                <option value="">-- Select a Question Bank --</option>
+                {banks.map((b) => <option key={b._id} value={b._id}>{b.name}</option>)}
+              </select>
+              {banks.length === 0 ? (
+                <p className="text-xs text-amber-600 mt-1">No question banks available yet. Create one in Question Banks first.</p>
+              ) : (
+                <p className="text-xs text-gray-400 mt-1">Questions are loaded ONLY from the selected bank. Changing the bank refreshes the list.</p>
+              )}
             </div>
 
-            {assignMode === 'random' ? (
-              <div className="mb-4">
-                <label className="label">Number of Questions</label>
-                <input type="number" min="1" value={assignCount} onChange={(e) => setAssignCount(e.target.value)}
-                  className="input-field" placeholder="Enter number of questions to randomly pick" />
+            {!assignBank ? (
+              <div className="p-6 text-center bg-amber-50 border border-amber-200 rounded-xl mb-4">
+                <p className="text-sm font-medium text-amber-700 mb-1">Select a Question Bank to proceed</p>
+                <p className="text-xs text-amber-600">The question list stays empty until a bank is selected, so no cross-bank questions can be assigned.</p>
               </div>
             ) : (
-              <div>
-                <div className="relative mb-3">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input type="text" placeholder="Search questions..." value={questionSearch}
-                    onChange={(e) => setQuestionSearch(e.target.value)}
-                    className="input-field pl-10" />
+              <>
+                <div className="flex gap-2 mb-5">
+                  <button onClick={() => setAssignMode('random')}
+                    className={`btn text-sm ${assignMode === 'random' ? 'btn-primary' : 'btn-secondary'}`}>
+                    Random Selection
+                  </button>
+                  <button onClick={() => setAssignMode('manual')}
+                    className={`btn text-sm ${assignMode === 'manual' ? 'btn-primary' : 'btn-secondary'}`}>
+                    Manual Selection
+                  </button>
                 </div>
-                <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-xl">
-                  {questions.length === 0 ? (
-                    <p className="p-6 text-gray-500 text-center text-sm">No questions found</p>
-                  ) : (
-                    questions.map((q) => (
-                      <label key={q._id}
-                        className={`flex items-start gap-3 p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${selectedQuestions.includes(q._id) ? 'bg-primary-50' : ''}`}>
-                        <input type="checkbox" checked={selectedQuestions.includes(q._id)}
-                          onChange={() => toggleQuestionSelection(q._id)} className="mt-1 rounded" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800 line-clamp-1">{q.questionText}</p>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <span className="text-xs text-gray-500">{q.subject}</span>
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${q.difficulty === 'easy' ? 'bg-green-50 text-green-700' : q.difficulty === 'hard' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>
-                              {q.difficulty}
-                            </span>
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">
-                              {q.questionType === 'mcq' ? 'MCQ' : q.questionType === 'coding' ? 'Code' : q.questionType === 'true_false' ? 'T/F' : q.questionType === 'multiple_select' ? 'Multi' : q.questionType === 'fill_blank' ? 'Fill' : q.questionType === 'descriptive' ? 'Desc' : q.questionType}
-                            </span>
-                            <span className="text-xs text-gray-400">{q.marks} mark{q.marks !== 1 ? 's' : ''}</span>
-                          </div>
+
+                {assignMode === 'random' ? (
+                  <div className="mb-4">
+                    <label className="label">Number of Questions</label>
+                    <input type="number" min="1" value={assignCount} onChange={(e) => setAssignCount(e.target.value)}
+                      className="input-field" placeholder="Enter number of questions to randomly pick" />
+                    <p className="text-xs text-gray-400 mt-1">Random selection picks from <strong>{assignBankName}</strong> only.</p>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="relative mb-3">
+                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input type="text" placeholder={`Search within ${assignBankName}...`} value={questionSearch}
+                        onChange={(e) => setQuestionSearch(e.target.value)}
+                        className="input-field pl-10" />
+                    </div>
+                    <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-xl">
+                      {questionsLoading ? (
+                        <div className="flex items-center justify-center p-8">
+                          <div className="w-6 h-6 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
                         </div>
-                      </label>
-                    ))
-                  )}
-                </div>
-                <p className="text-sm text-gray-500 mt-2">{selectedQuestions.length} question(s) selected</p>
-              </div>
+                      ) : questions.length === 0 ? (
+                        <p className="p-6 text-gray-500 text-center text-sm">No questions found in {assignBankName}</p>
+                      ) : (
+                        questions.map((q) => (
+                          <label key={q._id}
+                            className={`flex items-start gap-3 p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${selectedQuestions.includes(q._id) ? 'bg-primary-50' : ''}`}>
+                            <input type="checkbox" checked={selectedQuestions.includes(q._id)}
+                              onChange={() => toggleQuestionSelection(q._id)} className="mt-1 rounded" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800 line-clamp-1">{q.questionText}</p>
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                <span className="text-xs text-gray-500">{q.subject}</span>
+                                <span className={`text-xs px-1.5 py-0.5 rounded ${q.difficulty === 'easy' ? 'bg-green-50 text-green-700' : q.difficulty === 'hard' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>
+                                  {q.difficulty}
+                                </span>
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">
+                                  {q.questionType === 'mcq' ? 'MCQ' : q.questionType === 'coding' ? 'Code' : q.questionType === 'true_false' ? 'T/F' : q.questionType === 'multiple_select' ? 'Multi' : q.questionType === 'fill_blank' ? 'Fill' : q.questionType === 'descriptive' ? 'Desc' : q.questionType}
+                                </span>
+                                <span className="text-xs text-gray-400">{q.marks} mark{q.marks !== 1 ? 's' : ''}</span>
+                              </div>
+                            </div>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500 mt-2">
+                      {questionsLoading ? 'Loading questions...' : (
+                        <>{selectedQuestions.length} of {questions.length} question(s) selected from {assignBankName}</>
+                      )}
+                    </p>
+                  </div>
+                )}
+              </>
             )}
 
             <div className="flex gap-3 justify-end mt-5 pt-4 border-t border-gray-100">
               <button onClick={() => setShowAssignModal(false)} className="btn-secondary">Cancel</button>
-              <button onClick={handleAssign} className="btn-primary">Assign</button>
+              <button onClick={handleAssign} disabled={!assignBank} className={`btn-primary ${!assignBank ? 'opacity-50 cursor-not-allowed' : ''}`}>Assign</button>
             </div>
           </div>
         </div>

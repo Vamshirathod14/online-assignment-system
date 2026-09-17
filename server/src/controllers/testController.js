@@ -58,7 +58,7 @@ exports.toggleStatus = async (req, res, next) => {
 
 exports.assignQuestionsManual = async (req, res, next) => {
   try {
-    const test = await testService.assignQuestionsManual(req.params.id, req.body.questionIds);
+    const test = await testService.assignQuestionsManual(req.params.id, req.body.questionIds, req.body.questionBank);
     sendResponse(res, 200, test, 'Questions assigned successfully');
   } catch (error) {
     next(error);
@@ -67,7 +67,7 @@ exports.assignQuestionsManual = async (req, res, next) => {
 
 exports.assignQuestionsRandom = async (req, res, next) => {
   try {
-    const test = await testService.assignQuestionsRandom(req.params.id, req.body.count);
+    const test = await testService.assignQuestionsRandom(req.params.id, req.body.count, req.body.questionBank);
     sendResponse(res, 200, test, 'Questions randomly assigned successfully');
   } catch (error) {
     next(error);

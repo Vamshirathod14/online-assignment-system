@@ -3,6 +3,7 @@ module.exports = {
   Student: require('./Student'),
   Test: require('./Test'),
   Question: require('./Question'),
+  QuestionBank: require('./QuestionBank'),
   ExamAttempt: require('./ExamAttempt'),
   Result: require('./Result'),
   CameraSnapshot: require('./CameraSnapshot'),

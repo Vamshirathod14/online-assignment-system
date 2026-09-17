@@ -13,8 +13,8 @@ exports.create = async (req, res, next) => {
 
 exports.getAll = async (req, res, next) => {
   try {
-    const { search, subject, difficulty, questionType, marks, sortBy } = req.query;
-    const questions = await questionService.getAll({ search, subject, difficulty, questionType, marks, sortBy });
+    const { search, subject, difficulty, questionType, marks, sortBy, questionBank } = req.query;
+    const questions = await questionService.getAll({ search, subject, difficulty, questionType, marks, sortBy, questionBank });
     sendResponse(res, 200, questions);
   } catch (error) {
     next(error);
@@ -62,7 +62,7 @@ exports.bulkUpload = async (req, res, next) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'Please upload an Excel file' });
     }
-    const results = await questionService.bulkUpload(req.file.buffer, req.user._id);
+    const results = await questionService.bulkUpload(req.file.buffer, req.user._id, req.body.questionBankId || null);
     sendResponse(res, 200, results, 'Bulk upload completed');
   } catch (error) {
     next(error);
@@ -71,7 +71,7 @@ exports.bulkUpload = async (req, res, next) => {
 
 exports.getQuestionCount = async (req, res, next) => {
   try {
-    const count = await questionService.getQuestionCount();
+    const count = await questionService.getQuestionCount(req.query.questionBank);
     sendResponse(res, 200, { count });
   } catch (error) {
     next(error);
@@ -111,8 +111,8 @@ exports.duplicate = async (req, res, next) => {
 
 exports.exportQuestions = async (req, res, next) => {
   try {
-    const { subject, difficulty, questionType } = req.query;
-    const buffer = await questionService.exportQuestions({ subject, difficulty, questionType });
+    const { subject, difficulty, questionType, questionBank } = req.query;
+    const buffer = await questionService.exportQuestions({ subject, difficulty, questionType, questionBank });
     res.setHeader('Content-Disposition', 'attachment; filename=questions.xlsx');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.send(buffer);

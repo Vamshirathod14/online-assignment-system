@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
+import { useSearchParams } from 'react-router-dom';
 import api from '../../services/api';
 import { Search, Plus, Upload, Pencil, Trash2, HelpCircle, X, Download, Copy, Filter, CheckSquare } from 'lucide-react';
 
@@ -35,6 +36,7 @@ const initialQuestion = {
   correctAnswer: '',
   difficulty: 'medium',
   subject: '',
+  questionBank: '',
   marks: '1',
   language: '',
   allowedLanguages: [],
@@ -48,6 +50,7 @@ const initialQuestion = {
 };
 
 export default function AdminQuestions() {
+  const [searchParams] = useSearchParams();
   const [questions, setQuestions] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -59,14 +62,17 @@ export default function AdminQuestions() {
 
   const [showUpload, setShowUpload] = useState(false);
   const [uploadFile, setUploadFile] = useState(null);
+  const [uploadBankId, setUploadBankId] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
 
   const [subjectFilter, setSubjectFilter] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [bankFilter, setBankFilter] = useState(searchParams.get('bank') || '');
   const [sortBy, setSortBy] = useState('newest');
   const [subjects, setSubjects] = useState([]);
+  const [banks, setBanks] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState([]);
@@ -79,6 +85,7 @@ export default function AdminQuestions() {
       if (subjectFilter) params.subject = subjectFilter;
       if (difficultyFilter) params.difficulty = difficultyFilter;
       if (typeFilter) params.questionType = typeFilter;
+      if (bankFilter) params.questionBank = bankFilter;
       if (sortBy) params.sortBy = sortBy;
       const { data } = await api.get('/questions', { params });
       setQuestions(data.data);
@@ -87,7 +94,7 @@ export default function AdminQuestions() {
     } finally {
       setLoading(false);
     }
-  }, [search, subjectFilter, difficultyFilter, typeFilter, sortBy]);
+  }, [search, subjectFilter, difficultyFilter, typeFilter, sortBy, bankFilter]);
 
   const fetchSubjects = useCallback(async () => {
     try {
@@ -96,8 +103,16 @@ export default function AdminQuestions() {
     } catch { /* ignore */ }
   }, []);
 
+  const fetchBanks = useCallback(async () => {
+    try {
+      const { data } = await api.get('/question-banks');
+      setBanks(data.data || []);
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => { fetchQuestions(); }, [fetchQuestions]);
   useEffect(() => { fetchSubjects(); }, [fetchSubjects]);
+  useEffect(() => { fetchBanks(); }, [fetchBanks]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -106,7 +121,7 @@ export default function AdminQuestions() {
 
   const handleTypeChange = (e) => {
     const newType = e.target.value;
-    setFormData({ ...initialQuestion, questionType: newType, questionText: formData.questionText, difficulty: formData.difficulty, subject: formData.subject });
+    setFormData({ ...initialQuestion, questionType: newType, questionText: formData.questionText, difficulty: formData.difficulty, subject: formData.subject, questionBank: formData.questionBank });
     setErrors({});
   };
 
@@ -194,6 +209,7 @@ export default function AdminQuestions() {
       difficulty: formData.difficulty,
       subject: formData.subject,
       marks: parseInt(formData.marks) || 1,
+      questionBank: formData.questionBank || undefined,
     };
     if (formData.questionType === 'mcq') {
       payload.options = [{ label: 'A', text: formData.optionA }, { label: 'B', text: formData.optionB }, { label: 'C', text: formData.optionC }, { label: 'D', text: formData.optionD }];
@@ -242,6 +258,7 @@ export default function AdminQuestions() {
       optionA: optMap['A'] || '', optionB: optMap['B'] || '', optionC: optMap['C'] || '', optionD: optMap['D'] || '',
       correctOption: q.correctOption || 'A', correctOptions: q.correctOptions || [], correctAnswer: q.correctAnswer || '',
       difficulty: q.difficulty || 'medium', subject: q.subject || '',
+      questionBank: q.questionBank?._id || q.questionBank || '',
       marks: q.marks?.toString() || '1',
       allowedLanguages: q.allowedLanguages || (q.language ? [q.language] : []),
       language: q.language || '',
@@ -297,6 +314,7 @@ export default function AdminQuestions() {
       if (subjectFilter) params.subject = subjectFilter;
       if (difficultyFilter) params.difficulty = difficultyFilter;
       if (typeFilter) params.questionType = typeFilter;
+      if (bankFilter) params.questionBank = bankFilter;
       const response = await api.get('/questions/export', { params, responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
@@ -319,6 +337,7 @@ export default function AdminQuestions() {
     try {
       const fd = new FormData();
       fd.append('file', uploadFile);
+      if (uploadBankId) fd.append('questionBankId', uploadBankId);
       const { data } = await api.post('/questions/bulk-upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       setUploadResult(data.data);
       fetchQuestions();
@@ -338,8 +357,8 @@ export default function AdminQuestions() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
-  const hasActiveFilters = subjectFilter || difficultyFilter || typeFilter;
-  const clearFilters = () => { setSubjectFilter(''); setDifficultyFilter(''); setTypeFilter(''); setSortBy('newest'); };
+  const hasActiveFilters = subjectFilter || difficultyFilter || typeFilter || bankFilter;
+  const clearFilters = () => { setSubjectFilter(''); setDifficultyFilter(''); setTypeFilter(''); setBankFilter(''); setSortBy('newest'); };
 
   const getDifficultyBadge = (d) => {
     if (d === 'easy') return <span className="badge-success">Easy</span>;
@@ -363,10 +382,10 @@ export default function AdminQuestions() {
           <button onClick={handleExport} className="btn-secondary text-sm">
             <Download className="w-4 h-4" /> Export
           </button>
-          <button onClick={() => { setShowUpload(true); setUploadResult(null); setUploadFile(null); setApiError(''); }} className="btn-success text-sm">
+          <button onClick={() => { setShowUpload(true); setUploadResult(null); setUploadFile(null); setUploadBankId(bankFilter && bankFilter !== 'unassigned' ? bankFilter : ''); setApiError(''); }} className="btn-success text-sm">
             <Upload className="w-4 h-4" /> Import
           </button>
-          <button onClick={() => { setShowForm(true); setEditingId(null); setFormData(initialQuestion); setApiError(''); }} className="btn-primary text-sm">
+          <button onClick={() => { setShowForm(true); setEditingId(null); setFormData({ ...initialQuestion, questionBank: bankFilter && bankFilter !== 'unassigned' ? bankFilter : '' }); setApiError(''); }} className="btn-primary text-sm">
             <Plus className="w-4 h-4" /> Add Question
           </button>
         </div>
@@ -388,6 +407,14 @@ export default function AdminQuestions() {
 
         {showFilters && (
           <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-gray-100">
+            <div className="min-w-[150px]">
+              <label className="text-xs text-gray-500 mb-1 block">Question Bank</label>
+              <select value={bankFilter} onChange={(e) => setBankFilter(e.target.value)} className="input-field text-sm">
+                <option value="">All Banks</option>
+                {banks.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
+                <option value="unassigned">Unassigned</option>
+              </select>
+            </div>
             <div className="min-w-[140px]">
               <label className="text-xs text-gray-500 mb-1 block">Subject</label>
               <select value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)} className="input-field text-sm">
@@ -447,8 +474,16 @@ export default function AdminQuestions() {
             <p className="text-sm text-gray-500 mb-4">
               Upload Excel (.xlsx). <strong>MCQ columns:</strong> Question, OptionA, OptionB, OptionC, OptionD, CorrectAnswer, Subject, Marks, Difficulty.
               <br /><strong>Coding columns:</strong> Type=coding, Question, Languages, StarterCode, Constraints, Explanation, SampleInput, SampleOutput, HiddenInput, HiddenOutput, TimeLimit, MemoryLimit, Subject, Marks, Difficulty.
+              <br />Select a <strong>target question bank</strong> below (all rows are added there), or add a <strong>QuestionBank</strong> column per row to assign rows to named banks automatically.
             </p>
             {apiError && <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl mb-4 text-sm font-medium">{apiError}</div>}
+            <div className="mb-4">
+              <label className="label">Target Question Bank</label>
+              <select value={uploadBankId} onChange={(e) => setUploadBankId(e.target.value)} className="input-field">
+                <option value="">-- Unassigned --</option>
+                {banks.map((b) => <option key={b._id} value={b._id}>{b.name}</option>)}
+              </select>
+            </div>
             <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center mb-4 hover:border-primary-300 transition-colors">
               <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
               <input type="file" accept=".xlsx,.xls" onChange={(e) => setUploadFile(e.target.files[0])} className="text-sm text-gray-600" />
@@ -669,6 +704,13 @@ export default function AdminQuestions() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
+                  <label className="label">Question Bank</label>
+                  <select name="questionBank" value={formData.questionBank} onChange={handleChange} className="input-field">
+                    <option value="">-- Unassigned --</option>
+                    {banks.map((b) => <option key={b._id} value={b._id}>{b.name}</option>)}
+                  </select>
+                </div>
+                <div>
                   <label className="label">Difficulty</label>
                   <select name="difficulty" value={formData.difficulty} onChange={handleChange} className="input-field">
                     <option value="easy">Easy</option>
@@ -713,6 +755,7 @@ export default function AdminQuestions() {
                   <th className="table-header-cell">#</th>
                   <th className="table-header-cell">Question</th>
                   <th className="table-header-cell">Type</th>
+                  <th className="table-header-cell">Bank</th>
                   <th className="table-header-cell">Subject</th>
                   <th className="table-header-cell">Difficulty</th>
                   <th className="table-header-cell">Marks</th>
@@ -728,6 +771,13 @@ export default function AdminQuestions() {
                     <td className="table-cell text-gray-500">{index + 1}</td>
                     <td className="table-cell font-medium text-gray-900 max-w-xs truncate">{q.questionText}</td>
                     <td className="table-cell">{getTypeBadge(q.questionType)}</td>
+                    <td className="table-cell">
+                      {q.questionBank?.name ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 text-xs font-medium">{q.questionBank.name}</span>
+                      ) : (
+                        <span className="text-xs text-gray-400">Unassigned</span>
+                      )}
+                    </td>
                     <td className="table-cell text-gray-600">{q.subject}</td>
                     <td className="table-cell">{getDifficultyBadge(q.difficulty)}</td>
                     <td className="table-cell text-gray-600 font-mono">{q.marks}</td>
